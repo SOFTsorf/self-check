@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Pro</title>
+    <title>DL SelfCheck Kiosk</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -12,6 +12,7 @@
             --accent-blue: #4c8bf5;
             --success-green: #2ecc71;
             --error-red: #e74c3c;
+            --key-bg: #222;
         }
 
         body {
@@ -47,16 +48,14 @@
         #reader { width: 100% !important; height: 100% !important; }
         #reader__dashboard, #reader__status_span, video + div { display: none !important; }
 
-        /* Buttons */
         .btn-ui {
             background: #222;
             border: 1px solid #444;
             color: white;
             padding: 12px 24px;
             border-radius: 25px;
-            font-size: 0.9rem;
+            font-size: 1rem;
             cursor: pointer;
-            margin-top: 10px;
         }
 
         .footer-link {
@@ -76,18 +75,61 @@
             z-index: 9999;
             justify-content: center; align-items: center;
             flex-direction: column; text-align: center;
+            background: black;
         }
 
         #overlay-result h2 { font-size: 3.5rem; margin: 0; font-weight: 800; }
-        #overlay-help { background-color: #1a1a1a; }
-        #overlay-help h2 { color: var(--error-red); font-size: 2rem; margin-bottom: 20px; }
 
-        .pulse { animation: pulse-red 1.5s infinite; }
+        /* Hilfe Seite */
+        #overlay-help { background-color: #1a0000; animation: pulse-red 2s infinite; }
         @keyframes pulse-red {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); background-color: #330000; }
-            100% { transform: scale(1); }
+            0% { background-color: #1a0000; }
+            50% { background-color: #440000; }
+            100% { background-color: #1a0000; }
         }
+
+        /* PIN Tastatur Styling */
+        #pin-pad-container {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 10000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pin-display {
+            font-size: 2rem;
+            letter-spacing: 10px;
+            margin-bottom: 20px;
+            height: 40px;
+            color: var(--accent-blue);
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 15px;
+        }
+
+        .key {
+            width: 80px;
+            height: 80px;
+            background: var(--key-bg);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 1px solid #333;
+            cursor: pointer;
+        }
+
+        .key:active { background: #444; }
+        .key.cancel { background: #441111; font-size: 1rem; }
 
         video { object-fit: cover !important; }
     </style>
@@ -99,7 +141,7 @@
             <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
         </svg>
         <h1>DL SelfCheck</h1>
-        <p class="subtitle">Scanne den QR-Code ein...</p>
+        <p class="subtitle">QR-Code scannen</p>
         <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()">Vollbild aktivieren</button>
     </div>
 
@@ -107,19 +149,35 @@
         <div id="reader"></div>
     </div>
 
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-        <button class="footer-link" onclick="openHelp()">Probleme beim Scannen?</button>
-    </div>
+    <button class="footer-link" onclick="openHelp()">Probleme beim Scannen?</button>
 
     <div id="overlay-result" class="full-overlay">
         <h2 id="res-title"></h2>
         <p id="res-text"></p>
     </div>
 
-    <div id="overlay-help" class="full-overlay pulse">
-        <h2>Mitarbeiter wurde gerufen!</h2>
+    <div id="overlay-help" class="full-overlay">
+        <h2 style="font-size: 2rem; color: var(--error-red);">Mitarbeiter gerufen!</h2>
         <p>Bitte warten Sie am Terminal.</p>
-        <button class="btn-ui" style="background: var(--success-green); border:none;" onclick="resolveProblem()">Problem gelöst</button>
+        <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad()">Problem gelöst</button>
+    </div>
+
+    <div id="pin-pad-container">
+        <div class="pin-display" id="pin-dots"></div>
+        <div class="numpad">
+            <div class="key" onclick="pressKey('1')">1</div>
+            <div class="key" onclick="pressKey('2')">2</div>
+            <div class="key" onclick="pressKey('3')">3</div>
+            <div class="key" onclick="pressKey('4')">4</div>
+            <div class="key" onclick="pressKey('5')">5</div>
+            <div class="key" onclick="pressKey('6')">6</div>
+            <div class="key" onclick="pressKey('7')">7</div>
+            <div class="key" onclick="pressKey('8')">8</div>
+            <div class="key" onclick="pressKey('9')">9</div>
+            <div class="key cancel" onclick="closePinPad()">X</div>
+            <div class="key" onclick="pressKey('0')">0</div>
+            <div class="key cancel" onclick="clearPin()">C</div>
+        </div>
     </div>
 
     <script>
@@ -128,43 +186,25 @@
         let isScanning = true;
         let torchActive = false;
         let helpInterval = null;
+        let currentPin = "";
         let audioCtx = null;
 
-        // Töne erzeugen
-        function getAudioCtx() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            return audioCtx;
-        }
+        function getAudioCtx() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
 
         function playSound(freq, type, duration, vol) {
             const ctx = getAudioCtx();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
             gain.gain.setValueAtTime(vol, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + duration);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + duration);
         }
 
-        function playSuccess() { playSound(880, 'sine', 0.5, 0.1); } // Hoher Ping
-        function playError() { playSound(120, 'sawtooth', 0.6, 0.1); } // Tiefer Buzzer
+        // Wake Lock
+        if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(console.error); }
 
-        function playTripleError() {
-            playError();
-            setTimeout(playError, 1000);
-            setTimeout(playError, 2000);
-        }
-
-        // --- Wake Lock (Display an lassen) ---
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').catch(console.error);
-        }
-
-        // --- Vollbild ---
         function toggleFullScreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen();
@@ -172,28 +212,36 @@
             }
         }
 
-        // --- Hilfe Bereich ---
+        // Hilfe & PIN Logik
         function openHelp() {
             isScanning = false;
             document.getElementById('overlay-help').style.display = 'flex';
-            // Alarm Ton Intervall
-            helpInterval = setInterval(() => {
-                playSound(440, 'triangle', 0.3, 0.05);
-            }, 1500);
+            helpInterval = setInterval(() => { playSound(440, 'triangle', 0.3, 0.05); }, 1500);
         }
 
-        function resolveProblem() {
-            const pin = prompt("Bitte Mitarbeiter-PIN eingeben:");
-            if (pin === "2014") {
+        function showPinPad() { document.getElementById('pin-pad-container').style.display = 'flex'; }
+        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; clearPin(); }
+        function clearPin() { currentPin = ""; updatePinDisplay(); }
+
+        function pressKey(num) {
+            currentPin += num;
+            updatePinDisplay();
+            if (currentPin === "2014") {
                 clearInterval(helpInterval);
+                document.getElementById('pin-pad-container').style.display = 'none';
                 document.getElementById('overlay-help').style.display = 'none';
+                clearPin();
                 isScanning = true;
-            } else {
-                alert("Falsche PIN!");
+            } else if (currentPin.length >= 4) {
+                setTimeout(clearPin, 300);
             }
         }
 
-        // --- Helligkeit & Blitz ---
+        function updatePinDisplay() {
+            document.getElementById('pin-dots').innerText = "*".repeat(currentPin.length);
+        }
+
+        // Blitz Automaik
         function checkBrightness() {
             const video = document.querySelector('video');
             if (!video || !isScanning) return;
@@ -213,21 +261,21 @@
             try { await html5QrCode.applyVideoConstraints({advanced: [{torch: on}]}); torchActive = on; } catch(e){}
         }
 
-        // --- Scanner Logik ---
+        // Scanner Feedback
         function showFeedback(isValid) {
             isScanning = false;
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
-                playSuccess();
+                playSound(880, 'sine', 0.5, 0.1); // Erfolg
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
-                document.getElementById('res-text').innerText = "Willkommen! Sie dürfen passieren.";
+                document.getElementById('res-text').innerText = "Zutritt gewährt!";
             } else {
-                playTripleError();
+                playSound(120, 'sawtooth', 0.6, 0.1); // Fehler
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
-                document.getElementById('res-text').innerText = "Bitte an einen Mitarbeiter wenden.";
+                document.getElementById('res-text').innerText = "Bitte Mitarbeiter rufen.";
             }
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 5000);
         }
@@ -237,9 +285,7 @@
             if (!isScanning) return;
             const scanned = text.trim().toLowerCase();
             showFeedback(scanned === targetUrl || scanned === targetUrl + "/");
-        }).then(() => {
-            setInterval(checkBrightness, 2500);
-        });
+        }).then(() => { setInterval(checkBrightness, 2500); });
     </script>
 </body>
 </html>
