@@ -37,17 +37,13 @@
         .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
         h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
 
-        /* Scanner Bereich */
         #container-scanner { position: relative; width: 280px; height: 280px; }
-        
         #reader-wrapper {
             width: 100%; height: 100%;
             border: 4px solid var(--accent-blue); border-radius: 50px;
             overflow: hidden; background: #111;
             transition: filter 0.6s ease, opacity 0.6s ease;
         }
-
-        /* Blur-Zustand */
         #reader-wrapper.blurred { filter: blur(20px) grayscale(0.8); opacity: 0.5; }
 
         #standby-clock {
@@ -135,11 +131,14 @@
     <div id="overlay-maintenance" class="full-overlay">
         <svg style="width:100px; height:100px; fill:black; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.45L19.53 19H4.47L12 5.45zM11 16h2v2h-2v-2zm0-7h2v5h-2V9z"/></svg>
         <h2 style="font-size: 2.8rem; font-weight: 800; margin: 0;">BAUARBEITEN</h2>
+        <p style="font-size: 1.4rem; max-width: 80%; color: black;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
         <button class="btn-ui" style="margin-top: 40px; background: black; color: white;" onclick="showPinPad('maintenance')">Reaktivieren</button>
     </div>
 
     <div id="overlay-closed" class="full-overlay">
+        <svg style="width:100px; height:100px; fill:white; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         <h2 style="font-size: 2.2rem; font-weight: 800;">Durchgangscenter geschlossen</h2>
+        <p style="font-size: 1.2rem; color: #bbb;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
         <button class="btn-ui" style="margin-top: 60px; border-color: #444;" onclick="showPinPad('closed')">Reaktivieren</button>
     </div>
 
@@ -169,7 +168,6 @@
         let lastActivity = Date.now();
         let touchTimer = null;
 
-        // --- Wach-Logik ---
         function wake() { 
             lastActivity = Date.now(); 
             document.getElementById('reader-wrapper').classList.remove('blurred');
@@ -180,8 +178,6 @@
             const now = Date.now();
             const wrapper = document.getElementById('reader-wrapper');
             const clock = document.getElementById('standby-clock');
-            
-            // Nach 30 Sekunden inaktivität bluren
             if (isScanning && (now - lastActivity > 30000)) {
                 wrapper.classList.add('blurred');
                 clock.style.display = 'block';
@@ -191,7 +187,6 @@
         }
         setInterval(checkStandby, 1000);
 
-        // --- 3-Finger Quick Lock ---
         function handleTouchStart(e) {
             wake();
             if (e.touches.length === 3) {
@@ -203,7 +198,6 @@
         }
         function handleTouchEnd() { clearTimeout(touchTimer); }
 
-        // --- Verlauf & Sounds ---
         function saveLog() {
             let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
             logs.unshift(new Date().toLocaleString('de-DE'));
@@ -230,7 +224,6 @@
             } catch(e){}
         }
 
-        // --- UI Steuerung ---
         function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
         function openHelp() { isScanning = false; document.getElementById('overlay-help').style.display = 'flex'; helpInterval = setInterval(() => playSound(600, 0.4), 1200); }
         function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
@@ -269,11 +262,9 @@
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; wake(); }, 4000);
         }
 
-        // --- Start Scanner ---
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
-            wake(); // Jedes Mal wenn die Kamera etwas sieht -> Wach werden!
+            wake();
             if (!isScanning) return;
-            
             const val = text.trim();
             if (val === "Bauarbeiten") { isScanning = false; document.getElementById('overlay-maintenance').style.display = 'flex'; }
             else if (val === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
