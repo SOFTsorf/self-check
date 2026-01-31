@@ -24,55 +24,35 @@
             align-items: center;
             justify-content: space-between;
             height: 100vh;
-            padding: 50px 20px;
+            padding: 40px 20px;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
-        .header {
-            text-align: center;
-        }
+        .header { text-align: center; }
 
-        /* Das blaue Kamera-Icon (SVG) */
         .camera-icon {
             width: 60px;
             height: 60px;
             fill: var(--accent-blue);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
-        h1 {
-            font-size: 2.2rem;
-            margin: 5px 0;
-            font-weight: 700;
-            letter-spacing: -1px;
-        }
-
-        .subtitle {
-            font-size: 1rem;
-            color: #999;
-            max-width: 280px;
-            margin: 10px auto;
-            line-height: 1.5;
-        }
+        h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
+        .subtitle { font-size: 1rem; color: #888; margin-bottom: 20px; }
 
         #reader-wrapper {
             position: relative;
-            width: 270px;
-            height: 270px;
+            width: 280px;
+            height: 280px;
             border: 4px solid var(--accent-blue);
             border-radius: 50px;
             overflow: hidden;
             background: #111;
         }
 
-        #reader {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        #reader__dashboard, #reader__status_span, video + div {
-            display: none !important;
-        }
+        #reader { width: 100% !important; height: 100% !important; }
+        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
 
         .footer-link {
             color: #777;
@@ -80,26 +60,20 @@
             font-size: 0.9rem;
             background: none;
             border: none;
-            cursor: pointer;
             margin-bottom: 20px;
         }
 
         #overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            text-align: center;
+            justify-content: center; align-items: center;
+            flex-direction: column; text-align: center;
         }
 
         #overlay h2 { font-size: 3.5rem; margin: 0; font-weight: 800; }
-        #overlay p { font-size: 1.3rem; padding: 20px; max-width: 80%; }
+        #overlay p { font-size: 1.3rem; padding: 20px; }
 
         video { object-fit: cover !important; }
     </style>
@@ -132,66 +106,91 @@
         const html5QrCode = new Html5Qrcode("reader");
         const overlay = document.getElementById('overlay');
         let isScanning = true;
+        let torchActive = false;
 
-        // Erzeugt einen einzelnen Fehler-Ton
         function playSingleBuzzer() {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
             const gain = context.createGain();
-
             oscillator.type = 'sawtooth';
-            oscillator.frequency.setValueAtTime(120, context.currentTime); 
-            
+            oscillator.frequency.setValueAtTime(120, context.currentTime);
             gain.gain.setValueAtTime(0.1, context.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.6);
-
             oscillator.connect(gain);
             gain.connect(context.destination);
-
-            oscillator.start();
-            oscillator.stop(context.currentTime + 0.6);
+            oscillator.start(); oscillator.stop(context.currentTime + 0.6);
         }
 
-        // Spielt den Ton 3 Mal im Abstand von 1 Sekunde
         function playTripleBuzzer() {
             playSingleBuzzer();
             setTimeout(playSingleBuzzer, 1000);
             setTimeout(playSingleBuzzer, 2000);
         }
 
+        // --- Automatischer Blitz-Logik ---
+        function checkBrightnessAndToggleTorch() {
+            const video = document.querySelector('video');
+            if (!video || !isScanning) return;
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 100; // Kleine Auflösung reicht für Helligkeitscheck
+            canvas.height = 100;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let brightness = 0;
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                // Luminanz-Formel
+                brightness += (0.299 * imageData.data[i] + 0.587 * imageData.data[i+1] + 0.114 * imageData.data[i+2]);
+            }
+            const avgBrightness = brightness / (canvas.width * canvas.height);
+
+            // Wenn Dunkel (< 40) und Blitz aus -> AN
+            // Wenn Hell (> 70) und Blitz an -> AUS
+            if (avgBrightness < 40 && !torchActive) {
+                setTorch(true);
+            } else if (avgBrightness > 70 && torchActive) {
+                setTorch(false);
+            }
+        }
+
+        async function setTorch(on) {
+            try {
+                await html5QrCode.applyVideoConstraints({ advanced: [{ torch: on }] });
+                torchActive = on;
+            } catch (e) { /* Blitz wird nicht unterstützt */ }
+        }
+
         function showFeedback(isValid) {
             isScanning = false;
             overlay.style.display = 'flex';
-
             if (isValid) {
                 overlay.style.backgroundColor = "var(--success-green)";
                 document.getElementById('overlay-title').innerText = "GÜLTIG";
-                document.getElementById('overlay-text').innerText = "Sie dürfen jetzt durchgehen!";
+                document.getElementById('overlay-text').innerText = "Zutritt gewährt!";
             } else {
-                playTripleBuzzer(); 
+                playTripleBuzzer();
                 overlay.style.backgroundColor = "var(--error-red)";
                 document.getElementById('overlay-title').innerText = "UNGÜLTIG";
                 document.getElementById('overlay-text').innerText = "Bitte wenden Sie sich an einen Mitarbeiter.";
             }
-
             setTimeout(() => {
                 overlay.style.display = 'none';
                 isScanning = true;
             }, 5000);
         }
 
-        const qrCodeSuccessCallback = (decodedText) => {
+        const config = { fps: 20, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0 };
+        
+        html5QrCode.start({ facingMode: "environment" }, config, (text) => {
             if (!isScanning) return;
-            const scanned = decodedText.trim().toLowerCase();
-            if (scanned === targetUrl || scanned === targetUrl + "/") {
-                showFeedback(true);
-            } else {
-                showFeedback(false);
-            }
-        };
-
-        const config = { fps: 20, qrbox: { width: 270, height: 270 }, aspectRatio: 1.0 };
-        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+            const scanned = text.trim().toLowerCase();
+            showFeedback(scanned === targetUrl || scanned === targetUrl + "/");
+        }).then(() => {
+            // Alle 2 Sekunden Helligkeit prüfen
+            setInterval(checkBrightnessAndToggleTorch, 2000);
+        });
     </script>
 </body>
 </html>
