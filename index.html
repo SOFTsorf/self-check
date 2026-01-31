@@ -44,7 +44,7 @@
             overflow: hidden; background: #111;
             transition: filter 0.6s ease, opacity 0.6s ease;
         }
-        #reader-wrapper.blurred { filter: blur(20px) grayscale(0.8); opacity: 0.5; }
+        #reader-wrapper.blurred { filter: blur(25px) grayscale(0.8); opacity: 0.4; }
 
         #standby-clock {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -96,6 +96,9 @@
         }
         .log-list { width: 100%; max-width: 400px; height: 60vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; color: #fff;}
         .log-item { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        
+        /* Unsichtbarer Canvas für die Bewegungserkennung */
+        #motion-canvas { display: none; }
     </style>
 </head>
 <body onclick="wake()" ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)">
@@ -158,6 +161,8 @@
         <button class="btn-ui" onclick="document.getElementById('history-overlay').style.display='none'; isScanning=true;">Zurück</button>
     </div>
 
+    <canvas id="motion-canvas" width="64" height="64"></canvas>
+
     <script>
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
         const html5QrCode = new Html5Qrcode("reader");
@@ -168,13 +173,18 @@
         let lastActivity = Date.now();
         let touchTimer = null;
 
+        // Motion Detection Variablen
+        const motionCanvas = document.getElementById('motion-canvas');
+        const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+        let prevFrameData = null;
+
         function wake() { 
             lastActivity = Date.now(); 
             document.getElementById('reader-wrapper').classList.remove('blurred');
             document.getElementById('standby-clock').style.display = 'none';
         }
 
-        // Überprüfung alle Sekunde, ob geblurt werden soll
+        // Standby Check
         setInterval(() => {
             const now = Date.now();
             const wrapper = document.getElementById('reader-wrapper');
@@ -187,6 +197,29 @@
             }
         }, 1000);
 
+        // Motion Detection Loop
+        function detectMotion() {
+            const video = document.querySelector('video');
+            if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+                motionCtx.drawImage(video, 0, 0, 64, 64);
+                const frameData = motionCtx.getImageData(0, 0, 64, 64).data;
+
+                if (prevFrameData) {
+                    let diff = 0;
+                    for (let i = 0; i < frameData.length; i += 4) {
+                        // Vergleiche Helligkeit (R+G+B)
+                        const brightnessNow = frameData[i] + frameData[i+1] + frameData[i+2];
+                        const brightnessPrev = prevFrameData[i] + prevFrameData[i+1] + prevFrameData[i+2];
+                        if (Math.abs(brightnessNow - brightnessPrev) > 40) diff++;
+                    }
+                    // Wenn mehr als 5% der Pixel sich geändert haben -> Wake
+                    if (diff > 200) wake();
+                }
+                prevFrameData = frameData;
+            }
+            requestAnimationFrame(detectMotion);
+        }
+
         function handleTouchStart(e) {
             wake();
             if (e.touches.length === 3) {
@@ -198,6 +231,7 @@
         }
         function handleTouchEnd() { clearTimeout(touchTimer); }
 
+        // Verlauf & Admin Funktionen
         function saveLog() {
             let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
             logs.unshift(new Date().toLocaleString('de-DE'));
@@ -262,36 +296,19 @@
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; wake(); }, 4000);
         }
 
-        // Scanner Start mit Bewegungs-Erkennung
+        // Start Scanner & Motion Detection
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
-            // JEDES Mal, wenn ein Code (oder Fragment) erkannt wird -> Aufwachen
-            wake(); 
+            wake();
             if (!isScanning) return;
             const val = text.trim();
             if (val === "Bauarbeiten") { isScanning = false; document.getElementById('overlay-maintenance').style.display = 'flex'; }
             else if (val === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
             else if (val.toLowerCase().includes("boxenjob")) showFeedback(true);
             else showFeedback(false);
-        }).catch(err => {
-            // Falls Scanner läuft aber nichts findet, triggern wir wake() über die interne Video-Schleife
-            // Hinweis: Die Library ruft den Callback oben nur bei Erfolg auf.
-            // Um echte Bewegung zu erkennen, nutzen wir einen kleinen Trick:
+        }).then(() => {
+            // Wenn der Scanner läuft, starte die Bewegungserkennung
+            detectMotion();
         });
-
-        // Trick: Wir hängen uns an das Video-Element, sobald es geladen ist
-        setTimeout(() => {
-            const video = document.querySelector('video');
-            if (video) {
-                video.addEventListener('play', () => {
-                    // Wir nutzen das Video-Update als "Herzschlag"
-                    setInterval(() => {
-                        // Wenn der Scanner aktiv ist (auch im Blur), wecken wir das System auf, 
-                        // sobald sich Pixel signifikant ändern? Nein, einfacher:
-                        // Wir lassen den Blur nur zu, wenn die Kamera KEINE Aktivität meldet.
-                    }, 500);
-                });
-            }
-        }, 2000);
     </script>
 </body>
 </html>
