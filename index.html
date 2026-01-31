@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Durchgangscenter Lahnstein SelfCheck</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #result-container {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+
+    <h1>Durchgangscenter Lahnstein SelfCheck</h1>
+    
+    <div id="reader"></div>
+
+    <div id="result-container" class="success">
+        <h2>Der QR-Code ist gültig.</h2>
+        <p>Sie dürfen jetzt durchgehen!</p>
+    </div>
+
+    <script>
+        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code";
+        const readerElement = document.getElementById('reader');
+        const resultContainer = document.getElementById('result-container');
+
+        const html5QrCode = new Html5Qrcode("reader");
+
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            // Überprüfung der URL
+            if (decodedText.trim() === targetUrl) {
+                handleSuccess();
+            }
+        };
+
+        function handleSuccess() {
+            // Scanner stoppen
+            html5QrCode.stop().then(() => {
+                // UI anpassen
+                readerElement.style.display = 'none';
+                resultContainer.style.display = 'block';
+
+                // Nach 5 Sekunden zurücksetzen
+                setTimeout(() => {
+                    location.reload(); // Einfachste Methode zum Neustart
+                }, 5000);
+            }).catch((err) => {
+                console.error("Fehler beim Stoppen des Scanners", err);
+            });
+        }
+
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // Startet die Kamera
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+    </script>
+</body>
+</html>
