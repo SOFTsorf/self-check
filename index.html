@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk Pro + Log</title>
+    <title>DL SelfCheck Kiosk Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -30,100 +30,111 @@
             overflow: hidden;
         }
 
-        /* Header & Verlauf Icon */
         .header { text-align: center; z-index: 10; width: 100%; position: relative; }
-        .history-btn {
-            position: absolute; right: 10px; top: 0;
-            background: none; border: none; cursor: pointer; fill: #555;
+        
+        /* Das Verlauf-Icon ganz dezent oben rechts */
+        .history-icon {
+            position: absolute; right: 0; top: 0;
+            fill: #444; cursor: pointer;
         }
 
-        .camera-icon { width: 50px; height: 50px; fill: var(--accent-blue); margin-bottom: 5px; }
-        h1 { font-size: 1.8rem; margin: 0; font-weight: 700; }
+        .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
+        h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
 
         #reader-wrapper {
-            position: relative; width: 280px; height: 280px;
-            border: 4px solid var(--accent-blue); border-radius: 50px;
-            overflow: hidden; background: #111;
+            position: relative;
+            width: 280px;
+            height: 280px;
+            border: 4px solid var(--accent-blue);
+            border-radius: 50px;
+            overflow: hidden;
+            background: #111;
         }
 
         .scanner-laser {
-            position: absolute; top: 0; left: 0; width: 100%; height: 3px;
-            background: var(--accent-blue); box-shadow: 0 0 15px 3px var(--accent-blue);
-            z-index: 10; animation: scan-anim 2s linear infinite;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 3px;
+            background: var(--accent-blue);
+            box-shadow: 0 0 15px 3px var(--accent-blue);
+            z-index: 10;
+            animation: scan-anim 2s linear infinite;
         }
+
         @keyframes scan-anim { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
 
         #reader { width: 100% !important; height: 100% !important; border: none !important; }
         #reader__scan_region svg { display: none !important; }
+        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
         video { object-fit: cover !important; }
 
         .btn-ui {
             background: #222; border: 1px solid #444; color: white;
             padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer;
         }
+        .footer-link { color: #777; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
 
-        /* Overlays */
         .full-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
             z-index: 100; justify-content: center; align-items: center;
             flex-direction: column; text-align: center; background: black;
         }
 
+        #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { background-color: #1a0000; } 50% { background-color: #550000; } 100% { background-color: #1a0000; } }
+
         #pin-pad-container {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.98); z-index: 200;
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); z-index: 200;
             flex-direction: column; justify-content: center; align-items: center;
         }
 
-        .pin-display { font-size: 2.5rem; letter-spacing: 12px; margin-bottom: 20px; color: var(--accent-blue); }
-        .numpad { display: grid; grid-template-columns: repeat(3, 80px); gap: 15px; }
+        .pin-display { font-size: 2.5rem; letter-spacing: 12px; margin-bottom: 30px; height: 50px; color: var(--accent-blue); font-weight: bold; }
+        .numpad { display: grid; grid-template-columns: repeat(3, 85px); gap: 20px; }
         .key {
-            width: 80px; height: 80px; background: var(--key-bg); border-radius: 50%;
+            width: 85px; height: 85px; background: var(--key-bg); border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 1.8rem; border: 1px solid #333;
+            font-size: 1.8rem; font-weight: bold; border: 1px solid #333; cursor: pointer;
         }
 
-        /* Verlaufs Liste Style */
-        #history-view {
+        /* Verlauf-Ansicht Overlay */
+        #history-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 300; padding: 40px 20px; box-sizing: border-box;
-            flex-direction: column; align-items: center;
+            background: black; z-index: 300; padding: 40px 20px; flex-direction: column; align-items: center;
         }
-        .log-list {
-            width: 100%; max-width: 400px; height: 60vh; overflow-y: auto;
-            border: 1px solid #333; margin: 20px 0; padding: 10px; background: #111;
-        }
-        .log-item {
-            padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem;
-            display: flex; justify-content: space-between;
-        }
+        .log-list { width: 100%; max-width: 400px; height: 50vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; }
+        .log-item { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <button class="history-btn" onclick="requestHistory()">
-            <svg width="30" height="30" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.11L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-        </button>
-        <svg class="camera-icon" viewBox="0 0 24 24"><path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+        <svg class="history-icon" onclick="openHistoryRequest()" width="30" height="30" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.11L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        
+        <svg class="camera-icon" viewBox="0 0 24 24">
+            <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+        </svg>
         <h1>DL SelfCheck</h1>
-        <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()" style="margin-top:5px; padding: 5px 15px; font-size: 0.8rem;">Vollbild</button>
+        <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()" style="font-size: 0.8rem; padding: 5px 15px;">Vollbild aktivieren</button>
     </div>
 
     <div id="reader-wrapper">
-        <div class="scanner-laser" id="laser"></div>
+        <div class="scanner-laser"></div>
         <div id="reader"></div>
     </div>
 
-    <button class="btn-ui" style="background:none; border:none; color:#555; text-decoration:underline" onclick="openHelp()">Probleme?</button>
+    <button class="footer-link" onclick="openHelp()">Probleme beim Scannen?</button>
 
     <div id="overlay-result" class="full-overlay">
-        <h2 id="res-title" style="font-size: 3.5rem;"></h2>
+        <h2 id="res-title" style="font-size: 3.5rem; font-weight: 800;"></h2>
+        <p id="res-text" style="font-size: 1.5rem;"></p>
     </div>
 
-    <div id="overlay-help" class="full-overlay" style="background-color: #500;">
-        <h2>MITARBEITER GERUFEN!</h2>
-        <button class="btn-ui" style="margin-top: 40px;" onclick="requestPin('alarm')">Mitarbeiter ist da</button>
+    <div id="overlay-help" class="full-overlay">
+        <h2 style="font-size: 2.2rem; color: var(--error-red); margin-bottom: 10px;">MITARBEITER GERUFEN!</h2>
+        <p style="font-size: 1.2rem;">Bitte warten Sie am Terminal.</p>
+        <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad('alarm')">Problem gelöst</button>
     </div>
 
     <div id="pin-pad-container">
@@ -132,15 +143,15 @@
             <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
             <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
             <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
-            <div class="key" style="color:red" onclick="closePinPad()">X</div><div class="key" onclick="pressKey('0')">0</div><div class="key" onclick="clearPin()">C</div>
+            <div class="key action" style="color:red" onclick="closePinPad()">X</div><div class="key" onclick="pressKey('0')">0</div><div class="key action" onclick="clearPin()">C</div>
         </div>
     </div>
 
-    <div id="history-view">
-        <h2>Scan-Verlauf</h2>
+    <div id="history-overlay">
+        <h2 style="color:var(--accent-blue)">Scan-Verlauf</h2>
         <div class="log-list" id="log-list"></div>
-        <button class="btn-ui" onclick="document.getElementById('history-view').style.display='none'; isScanning=true;">Schließen</button>
-        <button class="btn-ui" style="margin-top:10px; border-color:red; color:red;" onclick="clearLog()">Log löschen</button>
+        <button class="btn-ui" onclick="document.getElementById('history-overlay').style.display='none'; isScanning=true;">Zurück</button>
+        <button class="btn-ui" style="margin-top:15px; color:red; border-color:red; font-size:0.8rem;" onclick="localStorage.setItem('scanLogs','[]'); renderLogs();">Log löschen</button>
     </div>
 
     <script>
@@ -149,7 +160,7 @@
         let isScanning = true;
         let helpInterval = null;
         let currentPin = "";
-        let pinTarget = ""; // Merkt sich, warum die PIN gefragt wird
+        let pinTarget = ""; 
 
         function playSound(freq, duration) {
             try {
@@ -174,69 +185,64 @@
             helpInterval = setInterval(() => playSound(600, 0.4), 1200);
         }
 
-        function requestHistory() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function requestPin(reason) { pinTarget = reason; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; isScanning = true; clearPin(); }
+        function openHistoryRequest() { isScanning = false; pinTarget = "history"; document.getElementById('pin-pad-container').style.display = 'flex'; }
+        function showPinPad(target) { pinTarget = target; document.getElementById('pin-pad-container').style.display = 'flex'; }
+        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; isScanning = (pinTarget === 'alarm' ? false : true); clearPin(); }
         function clearPin() { currentPin = ""; updatePinDisplay(); }
 
         function pressKey(num) {
             currentPin += num;
             updatePinDisplay();
             if (currentPin === "2014") {
-                if(pinTarget === "history") showHistory();
-                if(pinTarget === "alarm") {
+                if (pinTarget === "history") renderLogs();
+                if (pinTarget === "alarm") {
                     clearInterval(helpInterval);
                     document.getElementById('overlay-help').style.display = 'none';
                 }
                 document.getElementById('pin-pad-container').style.display = 'none';
+                isScanning = (pinTarget === "history" ? false : true);
                 clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
         }
 
         function updatePinDisplay() { document.getElementById('pin-dots').innerText = "•".repeat(currentPin.length); }
 
-        // --- Log Logik ---
-        function saveToLog() {
+        function saveLog() {
             let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            const now = new Date();
-            const timeStr = now.toLocaleDateString('de-DE') + " " + now.toLocaleTimeString('de-DE');
-            logs.unshift(timeStr); // Neu oben anfügen
-            if(logs.length > 20) logs.pop(); // Nur letzten 20 behalten
+            logs.unshift(new Date().toLocaleString('de-DE'));
+            if(logs.length > 30) logs.pop();
             localStorage.setItem('scanLogs', JSON.stringify(logs));
         }
 
-        function showHistory() {
+        function renderLogs() {
             const list = document.getElementById('log-list');
             list.innerHTML = "";
             let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            logs.forEach(entry => {
-                list.innerHTML += `<div class="log-item"><span>Check-In</span> <span>${entry}</span></div>`;
-            });
-            if(logs.length === 0) list.innerHTML = "<p>Keine Einträge</p>";
-            document.getElementById('history-view').style.display = 'flex';
+            logs.forEach(l => list.innerHTML += `<div class="log-item"><span>Check-In</span><span>${l}</span></div>`);
+            document.getElementById('history-overlay').style.display = 'flex';
         }
-
-        function clearLog() { localStorage.setItem('scanLogs', '[]'); showHistory(); }
 
         function showFeedback(isValid) {
             isScanning = false;
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
-                playSound(880, 0.5); 
+                playSound(880, 0.6); 
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
-                saveToLog();
+                document.getElementById('res-text').innerText = "Zutritt gewährt!";
+                saveLog();
             } else {
                 playSound(150, 0.7);
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
+                document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
             }
-            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 3000);
+            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
         }
 
-        html5QrCode.start({ facingMode: "environment" }, { fps: 20 }, (text) => {
-            if (isScanning && text.trim().toLowerCase().includes("boxenjob")) showFeedback(true);
+        html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
+            if (isScanning && text.toLowerCase().includes("boxenjob")) showFeedback(true);
         });
     </script>
 </body>
