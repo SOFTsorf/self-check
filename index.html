@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk - Classic Design</title>
+    <title>DL SelfCheck Kiosk Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -45,7 +45,6 @@
             transition: filter 0.5s ease;
         }
 
-        /* Akku-Saver & Standby Effekte */
         #reader-wrapper.blurred { filter: blur(25px) grayscale(1); opacity: 0.3; }
         #standby-clock {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -78,6 +77,9 @@
 
         #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red { 0% { background-color: #1a0000; } 50% { background-color: #800000; } 100% { background-color: #1a0000; } }
+        
+        #overlay-maintenance { background-color: var(--warning-orange); color: black; z-index: 210; }
+        #overlay-closed { background-color: black; color: white; z-index: 220; }
 
         #pin-pad-container {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -128,6 +130,20 @@
         <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad('alarm')">Problem gelöst</button>
     </div>
 
+    <div id="overlay-maintenance" class="full-overlay">
+        <svg style="width:100px; height:100px; fill:black; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.45L19.53 19H4.47L12 5.45zM11 16h2v2h-2v-2zm0-7h2v5h-2V9z"/></svg>
+        <h2 style="font-size: 2.8rem; font-weight: 800; margin: 0;">BAUARBEITEN</h2>
+        <p style="font-size: 1.4rem; max-width: 80%; color: black;">Das System ist momentan außer Betrieb.</p>
+        <button class="btn-ui" style="margin-top: 40px; background: black; color: white;" onclick="showPinPad('maintenance')">Reaktivieren</button>
+    </div>
+
+    <div id="overlay-closed" class="full-overlay">
+        <svg style="width:100px; height:100px; fill:white; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <h2 style="font-size: 2.2rem; font-weight: 800;">Durchgangscenter geschlossen</h2>
+        <p style="font-size: 1.2rem; color: #bbb;">Bitte schaue später wieder vorbei.</p>
+        <button class="btn-ui" style="margin-top: 60px; border-color: #444;" onclick="showPinPad('closed')">Reaktivieren</button>
+    </div>
+
     <div id="pin-pad-container">
         <div class="pin-display" id="pin-dots"></div>
         <div class="numpad">
@@ -166,15 +182,13 @@
             document.getElementById('standby-clock').style.display = 'none';
         }
 
-        // Standby Check alle 1s
         setInterval(() => {
             const now = Date.now();
             if (isScanning && (now - lastActivity > 30000)) {
                 document.getElementById('reader-wrapper').classList.add('blurred');
-                const clock = document.getElementById('standby-clock');
-                clock.style.display = 'block';
+                document.getElementById('standby-clock').style.display = 'block';
                 const d = new Date();
-                clock.innerText = d.getHours().toString().padStart(2,'0') + ":" + d.getMinutes().toString().padStart(2,'0');
+                document.getElementById('standby-clock').innerText = d.getHours().toString().padStart(2,'0') + ":" + d.getMinutes().toString().padStart(2,'0');
             }
         }, 1000);
 
@@ -211,22 +225,23 @@
         function handleTouchStart(e) {
             wake();
             if (e.touches.length === 3) {
-                touchTimer = setTimeout(() => { isScanning = false; alert("Sicherheits-Verschluss aktiviert"); }, 2000);
+                touchTimer = setTimeout(() => {
+                    isScanning = false;
+                    document.getElementById('overlay-closed').style.display = 'flex';
+                }, 2000);
             }
         }
         function handleTouchEnd() { clearTimeout(touchTimer); }
 
-        function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
-        
         function openHelp() { 
             isScanning = false; 
             document.getElementById('overlay-help').style.display = 'flex'; 
             if(!helpInterval) helpInterval = setInterval(() => playSound(600, 0.4), 1200);
         }
 
-        function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function showPinPad(t) { pinTarget = t; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','history'].includes(pinTarget)) isScanning = true; clearPin(); }
+        function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
+        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','maintenance','closed','history'].includes(pinTarget)) isScanning = true; clearPin(); }
         function clearPin() { currentPin = ""; document.getElementById('pin-dots').innerText = ""; }
 
         function pressKey(n) {
@@ -235,10 +250,9 @@
             if (currentPin === "2014") {
                 document.getElementById('pin-pad-container').style.display = 'none';
                 if (pinTarget === "history") renderLogs();
-                if (pinTarget === "alarm") {
-                    clearInterval(helpInterval); helpInterval = null;
-                    document.getElementById('overlay-help').style.display = 'none';
-                }
+                if (pinTarget === "maintenance") document.getElementById('overlay-maintenance').style.display = 'none';
+                if (pinTarget === "closed") document.getElementById('overlay-closed').style.display = 'none';
+                if (pinTarget === "alarm") { clearInterval(helpInterval); helpInterval = null; document.getElementById('overlay-help').style.display = 'none'; }
                 isScanning = true; wake(); clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
         }
@@ -271,10 +285,15 @@
             document.getElementById('history-overlay').style.display = 'flex';
         }
 
+        function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
+
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
             wake();
             if (!isScanning) return;
-            if (text.trim().toLowerCase().includes("boxenjob")) showFeedback(true);
+            const val = text.trim();
+            if (val === "Bauarbeiten") { isScanning = false; document.getElementById('overlay-maintenance').style.display = 'flex'; }
+            else if (val === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
+            else if (val.toLowerCase().includes("boxenjob")) showFeedback(true);
             else showFeedback(false);
         }).then(() => { detectMotion(); });
     </script>
