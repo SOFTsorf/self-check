@@ -29,41 +29,41 @@
             padding: 30px 20px;
             box-sizing: border-box;
             overflow: hidden;
+            touch-action: none; /* Wichtig für die 3-Finger-Geste */
         }
 
         .header { text-align: center; z-index: 10; width: 100%; position: relative; }
-        
-        /* Verlauf-Icon dezent */
-        .history-icon { position: absolute; right: 0; top: 0; fill: #444; cursor: pointer; }
-
+        .history-icon { position: absolute; right: 0; top: 0; fill: #333; cursor: pointer; padding: 10px; }
         .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
         h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
 
+        /* Scanner mit Privacy-Blur Support */
         #reader-wrapper {
-            position: relative;
-            width: 280px;
-            height: 280px;
-            border: 4px solid var(--accent-blue);
-            border-radius: 50px;
-            overflow: hidden;
-            background: #111;
+            position: relative; width: 280px; height: 280px;
+            border: 4px solid var(--accent-blue); border-radius: 50px;
+            overflow: hidden; background: #111;
+            transition: filter 0.5s ease;
+        }
+
+        #reader-wrapper.blurred { filter: blur(15px) grayscale(0.5); }
+
+        /* Uhr im Standby */
+        #standby-clock {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 2rem; font-weight: bold; color: white; display: none; z-index: 20;
+            text-shadow: 0 0 10px rgba(0,0,0,1); pointer-events: none;
         }
 
         .scanner-laser {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 3px;
-            background: var(--accent-blue);
-            box-shadow: 0 0 15px 3px var(--accent-blue);
-            z-index: 10;
-            animation: scan-anim 2s linear infinite;
+            position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+            background: var(--accent-blue); box-shadow: 0 0 15px 3px var(--accent-blue);
+            z-index: 10; animation: scan-anim 2s linear infinite;
         }
-
         @keyframes scan-anim { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
 
         #reader { width: 100% !important; height: 100% !important; border: none !important; }
         #reader__scan_region svg { display: none !important; }
-        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
-        video { object-fit: cover !important; }
+        video { object-fit: cover !important; transition: opacity 0.5s; }
 
         .btn-ui {
             background: #222; border: 1px solid #444; color: white;
@@ -71,54 +71,41 @@
         }
         .footer-link { color: #777; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
 
+        /* Overlays */
         .full-overlay {
-            display: none; position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 100; justify-content: center; align-items: center;
-            flex-direction: column; text-align: center; background: black;
+            flex-direction: column; text-align: center; background: black; padding: 30px;
         }
 
-        /* Dein Original Hilfe-Bildschirm */
         #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red { 0% { background-color: #1a0000; } 50% { background-color: #550000; } 100% { background-color: #1a0000; } }
 
-        /* Neue Status-Overlays (Zusätzlich) */
         #overlay-maintenance { background-color: var(--warning-orange); color: black; z-index: 110; }
         #overlay-closed { background-color: black; color: white; z-index: 115; }
 
+        /* PIN Pad */
         #pin-pad-container {
-            display: none; position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95); z-index: 200;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.98); z-index: 200;
             flex-direction: column; justify-content: center; align-items: center;
         }
-
-        .pin-display { font-size: 2.5rem; letter-spacing: 12px; margin-bottom: 30px; height: 50px; color: var(--accent-blue); font-weight: bold; }
+        .pin-display { font-size: 2.5rem; letter-spacing: 12px; margin-bottom: 30px; height: 50px; color: var(--accent-blue); }
         .numpad { display: grid; grid-template-columns: repeat(3, 85px); gap: 20px; }
-        .key {
-            width: 85px; height: 85px; background: var(--key-bg); border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.8rem; font-weight: bold; border: 1px solid #333; cursor: pointer;
-        }
-
-        #history-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: black; z-index: 300; padding: 40px 20px; flex-direction: column; align-items: center;
-        }
-        .log-list { width: 100%; max-width: 400px; height: 50vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; }
-        .log-item { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        .key { width: 85px; height: 85px; background: var(--key-bg); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.8rem; border: 1px solid #333; }
     </style>
 </head>
-<body>
+<body ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)">
 
     <div class="header">
         <svg class="history-icon" onclick="openHistoryRequest()" width="30" height="30" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.11L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
         <svg class="camera-icon" viewBox="0 0 24 24"><path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
         <h1>DL SelfCheck</h1>
-        <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()" style="font-size: 0.8rem; padding: 5px 15px;">Vollbild aktivieren</button>
+        <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()" style="font-size: 0.8rem; padding: 5px 15px;">Vollbild</button>
     </div>
 
     <div id="reader-wrapper">
+        <div id="standby-clock">00:00</div>
         <div class="scanner-laser"></div>
         <div id="reader"></div>
     </div>
@@ -137,16 +124,12 @@
     </div>
 
     <div id="overlay-maintenance" class="full-overlay">
-        <svg style="width:100px; height:100px; fill:black; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.45L19.53 19H4.47L12 5.45zM11 16h2v2h-2v-2zm0-7h2v5h-2V9z"/></svg>
-        <h2 style="font-size: 2.8rem; font-weight: 800; margin: 0;">BAUARBEITEN</h2>
-        <p style="font-size: 1.4rem; max-width: 80%;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
-        <button class="btn-ui" style="margin-top: 40px; background: black; color: white;" onclick="showPinPad('maintenance')">Reaktivieren</button>
+        <h2 style="color:black; font-size: 2.5rem;">BAUARBEITEN</h2>
+        <button class="btn-ui" style="margin-top: 40px; background: black;" onclick="showPinPad('maintenance')">Reaktivieren</button>
     </div>
 
     <div id="overlay-closed" class="full-overlay">
-        <svg style="width:100px; height:100px; fill:white; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <h2 style="font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">Durchgangscenter geschlossen</h2>
-        <p style="font-size: 1.2rem; color: #bbb;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
+        <h2>Durchgangscenter geschlossen</h2>
         <button class="btn-ui" style="margin-top: 60px; border-color: #444;" onclick="showPinPad('closed')">Reaktivieren</button>
     </div>
 
@@ -156,112 +139,115 @@
             <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
             <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
             <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
-            <div class="key action" style="color:red" onclick="closePinPad()">X</div><div class="key" onclick="pressKey('0')">0</div><div class="key action" onclick="clearPin()">C</div>
+            <div class="key" style="color:red" onclick="closePinPad()">X</div><div class="key" onclick="pressKey('0')">0</div><div class="key" onclick="clearPin()">C</div>
         </div>
     </div>
 
-    <div id="history-overlay">
-        <h2 style="color:var(--accent-blue)">Scan-Verlauf</h2>
-        <div class="log-list" id="log-list"></div>
-        <button class="btn-ui" onclick="document.getElementById('history-overlay').style.display='none'; isScanning=true;">Zurück</button>
-    </div>
-
     <script>
-        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
+        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
         let helpInterval = null;
         let currentPin = "";
         let pinTarget = "";
+        let lastActivity = Date.now();
+        let touchTimer = null;
 
-        function playSound(freq, duration) {
+        // --- Privacy Blur & Wach Logic ---
+        function updateStandby() {
+            const now = Date.now();
+            const wrapper = document.getElementById('reader-wrapper');
+            const clock = document.getElementById('standby-clock');
+            
+            if (isScanning && (now - lastActivity > 30000)) { // 30 Sek Inaktivität
+                wrapper.classList.add('blurred');
+                clock.style.display = 'block';
+                const time = new Date();
+                clock.innerText = time.getHours().toString().padStart(2, '0') + ":" + time.getMinutes().toString().padStart(2, '0');
+            } else {
+                wrapper.classList.remove('blurred');
+                clock.style.display = 'none';
+            }
+        }
+        setInterval(updateStandby, 1000);
+
+        function wakeUp() { lastActivity = Date.now(); }
+        window.addEventListener('mousemove', wakeUp);
+        window.addEventListener('touchstart', wakeUp);
+
+        // --- 3-Finger Quick Lock Geste ---
+        function handleTouchStart(e) {
+            if (e.touches.length === 3) {
+                touchTimer = setTimeout(() => {
+                    isScanning = false;
+                    document.getElementById('overlay-closed').style.display = 'flex';
+                }, 2000);
+            }
+        }
+        function handleTouchEnd() { clearTimeout(touchTimer); }
+
+        // --- Standard Funktionen ---
+        function playSound(f, d) {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.frequency.setValueAtTime(freq, ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-                osc.connect(gain); gain.connect(ctx.destination);
-                osc.start(); osc.stop(ctx.currentTime + duration);
-            } catch(e) {}
+                const o = ctx.createOscillator(); const g = ctx.createGain();
+                o.frequency.setValueAtTime(f, ctx.currentTime);
+                g.gain.linearRampToValueAtTime(0, ctx.currentTime + d);
+                o.connect(g); g.connect(ctx.destination);
+                o.start(); o.stop(ctx.currentTime + d);
+            } catch(e){}
         }
 
-        function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
-        
         function openHelp() { 
             isScanning = false; 
-            document.getElementById('overlay-help').style.display = 'flex'; 
-            helpInterval = setInterval(() => playSound(600, 0.4), 1200); 
+            document.getElementById('overlay-help').style.display = 'flex';
+            helpInterval = setInterval(() => playSound(600, 0.4), 1200);
         }
 
-        function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function showPinPad(target) { pinTarget = target; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','maintenance','closed'].includes(pinTarget)) isScanning = true; clearPin(); }
-        function clearPin() { currentPin = ""; updatePinDisplay(); }
+        function showPinPad(t) { pinTarget = t; document.getElementById('pin-pad-container').style.display = 'flex'; }
+        function closePinPad() { 
+            document.getElementById('pin-pad-container').style.display = 'none'; 
+            if(!['alarm','maintenance','closed'].includes(pinTarget)) isScanning = true; 
+            clearPin();
+        }
 
-        function pressKey(num) {
-            currentPin += num;
-            updatePinDisplay();
+        function pressKey(n) {
+            currentPin += n;
+            document.getElementById('pin-dots').innerText = "•".repeat(currentPin.length);
             if (currentPin === "2014") {
                 document.getElementById('pin-pad-container').style.display = 'none';
-                if (pinTarget === "history") renderLogs();
                 if (pinTarget === "maintenance") document.getElementById('overlay-maintenance').style.display = 'none';
                 if (pinTarget === "closed") document.getElementById('overlay-closed').style.display = 'none';
                 if (pinTarget === "alarm") { clearInterval(helpInterval); document.getElementById('overlay-help').style.display = 'none'; }
-                isScanning = true;
-                clearPin();
+                isScanning = true; wakeUp(); clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
         }
+        function clearPin() { currentPin = ""; document.getElementById('pin-dots').innerText = ""; }
 
-        function updatePinDisplay() { document.getElementById('pin-dots').innerText = "•".repeat(currentPin.length); }
-        
-        function saveLog() {
-            let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            logs.unshift(new Date().toLocaleString('de-DE'));
-            if(logs.length > 50) logs.pop();
-            localStorage.setItem('scanLogs', JSON.stringify(logs));
-        }
-
-        function renderLogs() {
-            const list = document.getElementById('log-list');
-            list.innerHTML = "";
-            let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            logs.forEach(time => list.innerHTML += `<div class="log-item"><span>Check-In</span> <span>${time}</span></div>`);
-            document.getElementById('history-overlay').style.display = 'flex';
-        }
-
-        function showFeedback(valid) {
+        function showFeedback(v) {
             isScanning = false;
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
-            if (valid) {
+            if (v) {
                 playSound(880, 0.6); ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
-                document.getElementById('res-text').innerText = "Zutritt gewährt!";
-                saveLog();
             } else {
                 playSound(150, 0.7); ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
-                document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
             }
-            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
+            setTimeout(() => { ov.style.display = 'none'; isScanning = true; wakeUp(); }, 4000);
         }
+
+        function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
 
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
             if (!isScanning) return;
-            const content = text.trim();
-            
-            if (content === "Bauarbeiten") {
-                isScanning = false;
-                document.getElementById('overlay-maintenance').style.display = 'flex';
-            } else if (content === "Schließen") {
-                isScanning = false;
-                document.getElementById('overlay-closed').style.display = 'flex';
-            } else if (content.toLowerCase().includes("boxenjob")) {
-                showFeedback(true);
-            } else {
-                showFeedback(false);
-            }
+            wakeUp();
+            const c = text.trim();
+            if (c === "Bauarbeiten") { isScanning = false; document.getElementById('overlay-maintenance').style.display = 'flex'; }
+            else if (c === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
+            else if (c.toLowerCase().includes("boxenjob")) showFeedback(true);
+            else showFeedback(false);
         });
     </script>
 </body>
