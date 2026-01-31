@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk Pro</title>
+    <title>DL SelfCheck Kiosk Pro - Battery Saver</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -30,7 +30,11 @@
             box-sizing: border-box;
             overflow: hidden;
             touch-action: none;
+            transition: opacity 0.5s ease; /* Sanftes Aufwachen/Dimmen */
         }
+
+        /* Akku-Schonmodus: Körper wird im Standby gedimmt */
+        body.standby-dim { opacity: 0.3; }
 
         .header { text-align: center; z-index: 10; width: 100%; position: relative; }
         .history-icon { position: absolute; right: 0; top: 0; fill: #444; cursor: pointer; padding: 10px; }
@@ -44,12 +48,15 @@
             overflow: hidden; background: #111;
             transition: filter 0.6s ease, opacity 0.6s ease;
         }
-        #reader-wrapper.blurred { filter: blur(25px) grayscale(0.8); opacity: 0.4; }
+
+        /* Blur und starke Transparenz im Standby */
+        #reader-wrapper.blurred { filter: blur(30px) grayscale(1); opacity: 0.2; }
 
         #standby-clock {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 3.5rem; font-weight: bold; color: white; display: none; z-index: 100;
-            text-shadow: 0 0 20px rgba(0,0,0,1); pointer-events: none;
+            font-size: 3.5rem; font-weight: bold; color: rgba(255,255,255,0.6); 
+            display: none; z-index: 100;
+            text-shadow: 0 0 15px rgba(0,0,0,0.5); pointer-events: none;
         }
 
         .scanner-laser {
@@ -67,7 +74,7 @@
             background: #222; border: 1px solid #444; color: white;
             padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer;
         }
-        .footer-link { color: #777; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
+        .footer-link { color: #555; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
 
         .full-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -76,8 +83,6 @@
         }
 
         #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red { 0% { background-color: #1a0000; } 50% { background-color: #550000; } 100% { background-color: #1a0000; } }
-        
         #overlay-maintenance { background-color: var(--warning-orange); color: black; z-index: 210; }
         #overlay-closed { background-color: black; color: white; z-index: 220; }
 
@@ -97,7 +102,6 @@
         .log-list { width: 100%; max-width: 400px; height: 60vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; color: #fff;}
         .log-item { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; }
         
-        /* Unsichtbarer Canvas für die Bewegungserkennung */
         #motion-canvas { display: none; }
     </style>
 </head>
@@ -167,29 +171,30 @@
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
-        let helpInterval = null;
         let currentPin = "";
         let pinTarget = "";
         let lastActivity = Date.now();
         let touchTimer = null;
 
-        // Motion Detection Variablen
+        // Motion Detection
         const motionCanvas = document.getElementById('motion-canvas');
         const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
         let prevFrameData = null;
 
         function wake() { 
             lastActivity = Date.now(); 
+            document.body.classList.remove('standby-dim');
             document.getElementById('reader-wrapper').classList.remove('blurred');
             document.getElementById('standby-clock').style.display = 'none';
         }
 
-        // Standby Check
+        // Standby & Akku-Saver Check
         setInterval(() => {
             const now = Date.now();
             const wrapper = document.getElementById('reader-wrapper');
             const clock = document.getElementById('standby-clock');
             if (isScanning && (now - lastActivity > 30000)) {
+                document.body.classList.add('standby-dim');
                 wrapper.classList.add('blurred');
                 clock.style.display = 'block';
                 const d = new Date();
@@ -197,23 +202,19 @@
             }
         }, 1000);
 
-        // Motion Detection Loop
         function detectMotion() {
             const video = document.querySelector('video');
             if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
                 motionCtx.drawImage(video, 0, 0, 64, 64);
                 const frameData = motionCtx.getImageData(0, 0, 64, 64).data;
-
                 if (prevFrameData) {
                     let diff = 0;
                     for (let i = 0; i < frameData.length; i += 4) {
-                        // Vergleiche Helligkeit (R+G+B)
                         const brightnessNow = frameData[i] + frameData[i+1] + frameData[i+2];
                         const brightnessPrev = prevFrameData[i] + prevFrameData[i+1] + prevFrameData[i+2];
                         if (Math.abs(brightnessNow - brightnessPrev) > 40) diff++;
                     }
-                    // Wenn mehr als 5% der Pixel sich geändert haben -> Wake
-                    if (diff > 200) wake();
+                    if (diff > 180) wake(); // Sensibilität leicht erhöht für Akku-Modus
                 }
                 prevFrameData = frameData;
             }
@@ -231,7 +232,6 @@
         }
         function handleTouchEnd() { clearTimeout(touchTimer); }
 
-        // Verlauf & Admin Funktionen
         function saveLog() {
             let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
             logs.unshift(new Date().toLocaleString('de-DE'));
@@ -259,7 +259,7 @@
         }
 
         function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
-        function openHelp() { isScanning = false; document.getElementById('overlay-help').style.display = 'flex'; helpInterval = setInterval(() => playSound(600, 0.4), 1200); }
+        function openHelp() { isScanning = false; document.getElementById('overlay-help').style.display = 'flex'; }
         function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function showPinPad(t) { pinTarget = t; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','maintenance','closed','history'].includes(pinTarget)) isScanning = true; clearPin(); }
@@ -273,7 +273,7 @@
                 if (pinTarget === "history") renderLogs();
                 if (pinTarget === "maintenance") document.getElementById('overlay-maintenance').style.display = 'none';
                 if (pinTarget === "closed") document.getElementById('overlay-closed').style.display = 'none';
-                if (pinTarget === "alarm") { clearInterval(helpInterval); document.getElementById('overlay-help').style.display = 'none'; }
+                if (pinTarget === "alarm") document.getElementById('overlay-help').style.display = 'none';
                 if (pinTarget !== "history") isScanning = true;
                 wake(); clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
@@ -296,7 +296,6 @@
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; wake(); }, 4000);
         }
 
-        // Start Scanner & Motion Detection
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
             wake();
             if (!isScanning) return;
@@ -305,10 +304,7 @@
             else if (val === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
             else if (val.toLowerCase().includes("boxenjob")) showFeedback(true);
             else showFeedback(false);
-        }).then(() => {
-            // Wenn der Scanner läuft, starte die Bewegungserkennung
-            detectMotion();
-        });
+        }).then(() => { detectMotion(); });
     </script>
 </body>
 </html>
