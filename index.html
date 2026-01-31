@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk Pro</title>
+    <title>DL SelfCheck Kiosk</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
             --bg-color: #000000;
             --text-color: #ffffff;
             --accent-blue: #4c8bf5;
-            --success-green: #2ecc71;
+            --warning-yellow: #f1c40f;
             --error-red: #e74c3c;
             --key-bg: #222;
         }
@@ -25,14 +25,10 @@
             align-items: center;
             justify-content: space-between;
             height: 100vh;
-            padding: 30px 20px;
+            padding: 20px;
             box-sizing: border-box;
             overflow: hidden;
         }
-
-        .header { text-align: center; z-index: 10; }
-        .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
-        h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
 
         /* Scanner Bereich */
         #reader-wrapper {
@@ -44,44 +40,42 @@
             overflow: hidden;
             background: #111;
         }
-
-        /* Laser-Balken */
         .scanner-laser {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
+            top: 0; left: 0; width: 100%; height: 3px;
             background: var(--accent-blue);
             box-shadow: 0 0 15px 3px var(--accent-blue);
             z-index: 10;
             animation: scan-anim 2s linear infinite;
         }
+        @keyframes scan-anim { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+        #reader { width: 100% !important; height: 100% !important; }
+        #reader__scan_region svg { display: none !important; }
+        video { object-fit: cover !important; }
 
-        @keyframes scan-anim {
-            0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
-        }
-
-        /* Entfernt graue Boxen und weiße Ecken der Library */
-        #reader { width: 100% !important; height: 100% !important; border: none !important; }
-        #reader__scan_region { background: transparent !important; }
-        #reader__scan_region svg { display: none !important; } /* Entfernt die weißen Ecken */
-        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
-
-        .btn-ui {
+        /* Buttons unten */
+        .button-row { display: flex; gap: 10px; width: 100%; justify-content: center; }
+        .btn-footer {
             background: #222;
+            color: #888;
             border: 1px solid #444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 1rem;
+            padding: 12px 15px;
+            border-radius: 15px;
+            font-size: 0.85rem;
             cursor: pointer;
-            z-index: 10;
         }
-        .footer-link { color: #777; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
 
+        .btn-main {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* Overlays */
         .full-overlay {
             display: none;
             position: fixed;
@@ -89,70 +83,35 @@
             z-index: 100;
             justify-content: center; align-items: center;
             flex-direction: column; text-align: center;
-            background: black;
         }
 
-        #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red {
-            0% { background-color: #1a0000; }
-            50% { background-color: #550000; }
-            100% { background-color: #1a0000; }
-        }
+        #overlay-yellow { background: var(--warning-yellow); color: black; }
+        #overlay-red { background: var(--error-red); color: white; }
 
+        /* PIN Pad */
         #pin-pad-container {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
+            background: rgba(0,0,0,0.98);
             z-index: 200;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            justify-content: center; align-items: center;
         }
-
-        .pin-display {
-            font-size: 2.5rem;
-            letter-spacing: 12px;
-            margin-bottom: 30px;
-            height: 50px;
-            color: var(--accent-blue);
-            font-weight: bold;
-        }
-
-        .numpad {
-            display: grid;
-            grid-template-columns: repeat(3, 85px);
-            gap: 20px;
-        }
-
+        .pin-display { font-size: 3rem; letter-spacing: 15px; margin-bottom: 30px; color: var(--accent-blue); }
+        .numpad { display: grid; grid-template-columns: repeat(3, 85px); gap: 15px; }
         .key {
-            width: 85px;
-            height: 85px;
-            background: var(--key-bg);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.8rem;
-            font-weight: bold;
-            border: 1px solid #333;
-            cursor: pointer;
+            width: 85px; height: 85px; background: #222; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.8rem; font-weight: bold; border: 1px solid #333;
         }
-        .key:active { background: #555; }
-        .key.action { background: #333; font-size: 1.2rem; color: #bbb; }
-        .key.cancel { color: var(--error-red); }
-
-        video { object-fit: cover !important; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <svg class="camera-icon" viewBox="0 0 24 24">
-            <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-        </svg>
-        <h1>DL SelfCheck</h1>
-        <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()">Vollbild aktivieren</button>
+    <div style="text-align: center;">
+        <h1 style="font-size: 2.2rem; margin-bottom: 5px;">DL SelfCheck</h1>
+        <button id="fs-btn" class="btn-footer" onclick="toggleFullScreen()" style="margin-bottom: 10px;">Vollbild aktivieren</button>
     </div>
 
     <div id="reader-wrapper">
@@ -160,64 +119,55 @@
         <div id="reader"></div>
     </div>
 
-    <button class="footer-link" onclick="openHelp()">Probleme beim Scannen?</button>
-
-    <div id="overlay-result" class="full-overlay">
-        <h2 id="res-title" style="font-size: 3.5rem; font-weight: 800;"></h2>
-        <p id="res-text" style="font-size: 1.5rem;"></p>
+    <div class="button-row">
+        <button class="btn-footer" onclick="openYellowHelp()">Niemand da?</button>
+        <button class="btn-footer" onclick="openRedHelp()">Probleme beim Scannen?</button>
     </div>
 
-    <div id="overlay-help" class="full-overlay">
-        <h2 style="font-size: 2.2rem; color: var(--error-red); margin-bottom: 10px;">MITARBEITER GERUFEN!</h2>
-        <p style="font-size: 1.2rem;">Bitte warten Sie am Terminal.</p>
-        <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad()">Problem gelöst</button>
+    <div id="overlay-yellow" class="full-overlay">
+        <h1 style="font-size: 3rem;">GELB</h1>
+        <p style="font-size: 1.5rem;">Ein Mitarbeiter wird gerufen...</p>
+        <button class="btn-main" style="background: black; margin-top: 40px;" onclick="showPinPad()">Mitarbeiter ist da</button>
+    </div>
+
+    <div id="overlay-red" class="full-overlay">
+        <h1 style="font-size: 3rem;">ALARM</h1>
+        <p style="font-size: 1.5rem;">Bitte warten Sie auf Hilfe.</p>
+        <button class="btn-main" style="background: white; color: red; margin-top: 40px;" onclick="showPinPad()">Problem gelöst</button>
     </div>
 
     <div id="pin-pad-container">
         <div class="pin-display" id="pin-dots"></div>
         <div class="numpad">
-            <div class="key" onclick="pressKey('1')">1</div>
-            <div class="key" onclick="pressKey('2')">2</div>
-            <div class="key" onclick="pressKey('3')">3</div>
-            <div class="key" onclick="pressKey('4')">4</div>
-            <div class="key" onclick="pressKey('5')">5</div>
-            <div class="key" onclick="pressKey('6')">6</div>
-            <div class="key" onclick="pressKey('7')">7</div>
-            <div class="key" onclick="pressKey('8')">8</div>
-            <div class="key" onclick="pressKey('9')">9</div>
-            <div class="key action cancel" onclick="closePinPad()">X</div>
-            <div class="key" onclick="pressKey('0')">0</div>
-            <div class="key action" onclick="clearPin()">C</div>
+            <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
+            <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
+            <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
+            <div class="key" style="color:red" onclick="closePinPad()">X</div><div class="key" onclick="pressKey('0')">0</div><div class="key" onclick="clearPin()">C</div>
         </div>
     </div>
 
+    <div id="overlay-result" class="full-overlay">
+        <h2 id="res-title" style="font-size: 4rem;"></h2>
+    </div>
+
     <script>
-        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
+        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
-        let helpInterval = null;
+        let soundInterval = null;
         let currentPin = "";
         let audioCtx = null;
 
-        function getAudioCtx() { 
-            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
-            return audioCtx; 
-        }
-
+        function getAudioCtx() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+        
         function playSound(freq, type, duration, vol) {
-            try {
-                const ctx = getAudioCtx();
-                const osc = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, ctx.currentTime);
-                gainNode.gain.setValueAtTime(vol, ctx.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-                osc.connect(gainNode);
-                gainNode.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + duration);
-            } catch(e) {}
+            const ctx = getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + duration);
         }
 
         function toggleFullScreen() {
@@ -227,10 +177,23 @@
             }
         }
 
-        function openHelp() {
+        // --- GELBER MODUS ---
+        function openYellowHelp() {
             isScanning = false;
-            document.getElementById('overlay-help').style.display = 'flex';
-            helpInterval = setInterval(() => { playSound(600, 'sawtooth', 0.4, 0.4); }, 1200);
+            document.getElementById('overlay-yellow').style.display = 'flex';
+            soundInterval = setInterval(() => {
+                playSound(330, 'triangle', 0.5, 0.2); // Tieferer, pulsierender Ton
+            }, 1000);
+        }
+
+        // --- ROTER MODUS ---
+        function openRedHelp() {
+            isScanning = false;
+            document.getElementById('overlay-red').style.display = 'flex';
+            soundInterval = setInterval(() => {
+                playSound(900, 'sawtooth', 0.3, 0.4); // Hoher Alarmton
+                setTimeout(() => playSound(600, 'sawtooth', 0.3, 0.4), 300);
+            }, 800);
         }
 
         function showPinPad() { document.getElementById('pin-pad-container').style.display = 'flex'; }
@@ -241,14 +204,11 @@
             currentPin += num;
             updatePinDisplay();
             if (currentPin === "2014") {
-                clearInterval(helpInterval);
-                document.getElementById('pin-pad-container').style.display = 'none';
-                document.getElementById('overlay-help').style.display = 'none';
-                clearPin();
+                clearInterval(soundInterval);
+                document.querySelectorAll('.full-overlay, #pin-pad-container').forEach(el => el.style.display = 'none');
                 isScanning = true;
-            } else if (currentPin.length >= 4) {
-                setTimeout(clearPin, 300);
-            }
+                clearPin();
+            } else if (currentPin.length >= 4) setTimeout(clearPin, 500);
         }
 
         function updatePinDisplay() { document.getElementById('pin-dots').innerText = "•".repeat(currentPin.length); }
@@ -258,27 +218,19 @@
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
-                playSound(880, 'sine', 0.6, 0.5); 
+                playSound(880, 'sine', 0.5, 0.5);
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
-                document.getElementById('res-text').innerText = "Zutritt gewährt!";
             } else {
-                playSound(150, 'sawtooth', 0.7, 0.6);
-                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.6), 1000);
-                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.6), 2000);
+                playSound(150, 'square', 0.8, 0.5);
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
-                document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
             }
-            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
+            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 3000);
         }
 
-        // qrbox deaktiviert, damit keine graue Region entsteht
-        const config = { fps: 20, aspectRatio: 1.0 };
-        html5QrCode.start({ facingMode: "environment" }, config, (text) => {
-            if (!isScanning) return;
-            const scanned = text.trim().toLowerCase();
-            showFeedback(scanned === targetUrl || scanned === targetUrl + "/");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 20 }, (text) => {
+            if (isScanning && text.toLowerCase().includes("boxenjob")) showFeedback(true);
         });
     </script>
 </body>
