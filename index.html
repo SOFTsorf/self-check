@@ -34,6 +34,7 @@
         .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
         h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
 
+        /* Scanner Bereich */
         #reader-wrapper {
             position: relative;
             width: 280px;
@@ -43,7 +44,30 @@
             overflow: hidden;
             background: #111;
         }
-        #reader { width: 100% !important; height: 100% !important; }
+
+        /* Laser-Balken */
+        .scanner-laser {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-blue);
+            box-shadow: 0 0 15px 3px var(--accent-blue);
+            z-index: 10;
+            animation: scan-anim 2s linear infinite;
+        }
+
+        @keyframes scan-anim {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+
+        /* Entfernt graue Boxen und weiße Ecken der Library */
+        #reader { width: 100% !important; height: 100% !important; border: none !important; }
+        #reader__scan_region { background: transparent !important; }
+        #reader__scan_region svg { display: none !important; } /* Entfernt die weißen Ecken */
         #reader__dashboard, #reader__status_span, video + div { display: none !important; }
 
         .btn-ui {
@@ -71,7 +95,7 @@
         #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red {
             0% { background-color: #1a0000; }
-            50% { background-color: #660000; }
+            50% { background-color: #550000; }
             100% { background-color: #1a0000; }
         }
 
@@ -132,6 +156,7 @@
     </div>
 
     <div id="reader-wrapper">
+        <div class="scanner-laser"></div>
         <div id="reader"></div>
     </div>
 
@@ -179,24 +204,20 @@
             return audioCtx; 
         }
 
-        // Maximale Lautstärke-Funktion
         function playSound(freq, type, duration, vol) {
-            const ctx = getAudioCtx();
-            const osc = ctx.createOscillator();
-            const gainNode = ctx.createGain();
-
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, ctx.currentTime);
-            
-            // Volle Aussteuerung
-            gainNode.gain.setValueAtTime(vol, ctx.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-
-            osc.connect(gainNode);
-            gainNode.connect(ctx.destination);
-
-            osc.start();
-            osc.stop(ctx.currentTime + duration);
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gainNode.gain.setValueAtTime(vol, ctx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch(e) {}
         }
 
         function toggleFullScreen() {
@@ -209,8 +230,7 @@
         function openHelp() {
             isScanning = false;
             document.getElementById('overlay-help').style.display = 'flex';
-            // Aggressiverer Alarm (Sägezahn-Welle ist lauter/schärfer)
-            helpInterval = setInterval(() => { playSound(600, 'sawtooth', 0.4, 0.3); }, 1200);
+            helpInterval = setInterval(() => { playSound(600, 'sawtooth', 0.4, 0.4); }, 1200);
         }
 
         function showPinPad() { document.getElementById('pin-pad-container').style.display = 'flex'; }
@@ -238,15 +258,14 @@
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
-                playSound(880, 'sine', 0.6, 0.4); // Lauter Ping
+                playSound(880, 'sine', 0.6, 0.5); 
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
                 document.getElementById('res-text').innerText = "Zutritt gewährt!";
             } else {
-                // Lauter dreifach Buzzer
-                playSound(150, 'sawtooth', 0.7, 0.5);
-                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.5), 1000);
-                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.5), 2000);
+                playSound(150, 'sawtooth', 0.7, 0.6);
+                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.6), 1000);
+                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.6), 2000);
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
                 document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
@@ -254,7 +273,8 @@
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
         }
 
-        const config = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+        // qrbox deaktiviert, damit keine graue Region entsteht
+        const config = { fps: 20, aspectRatio: 1.0 };
         html5QrCode.start({ facingMode: "environment" }, config, (text) => {
             if (!isScanning) return;
             const scanned = text.trim().toLowerCase();
