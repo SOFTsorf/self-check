@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk Pro - Fixed Alarm</title>
+    <title>DL SelfCheck Kiosk - Classic Design</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -30,10 +30,7 @@
             box-sizing: border-box;
             overflow: hidden;
             touch-action: none;
-            transition: opacity 0.5s ease;
         }
-
-        body.standby-dim { opacity: 0.3; }
 
         .header { text-align: center; z-index: 10; width: 100%; position: relative; }
         .history-icon { position: absolute; right: 0; top: 0; fill: #444; cursor: pointer; padding: 10px; }
@@ -45,15 +42,15 @@
             width: 100%; height: 100%;
             border: 4px solid var(--accent-blue); border-radius: 50px;
             overflow: hidden; background: #111;
-            transition: filter 0.6s ease, opacity 0.6s ease;
+            transition: filter 0.5s ease;
         }
-        #reader-wrapper.blurred { filter: blur(30px) grayscale(1); opacity: 0.2; }
 
+        /* Akku-Saver & Standby Effekte */
+        #reader-wrapper.blurred { filter: blur(25px) grayscale(1); opacity: 0.3; }
         #standby-clock {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 3.5rem; font-weight: bold; color: rgba(255,255,255,0.6); 
-            display: none; z-index: 100;
-            text-shadow: 0 0 15px rgba(0,0,0,0.5); pointer-events: none;
+            font-size: 3.5rem; font-weight: bold; color: rgba(255,255,255,0.7); 
+            display: none; z-index: 100; pointer-events: none;
         }
 
         .scanner-laser {
@@ -79,19 +76,8 @@
             flex-direction: column; text-align: center; background: black; padding: 30px;
         }
 
-        /* Mitarbeiter-Hilfe Overlay mit Pulsieren */
-        #overlay-help { 
-            background-color: #1a0000; 
-            animation: pulse-red 1.5s infinite; 
-        }
-        @keyframes pulse-red { 
-            0% { background-color: #1a0000; } 
-            50% { background-color: #660000; } 
-            100% { background-color: #1a0000; } 
-        }
-
-        #overlay-maintenance { background-color: var(--warning-orange); color: black; z-index: 210; }
-        #overlay-closed { background-color: black; color: white; z-index: 220; }
+        #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { background-color: #1a0000; } 50% { background-color: #800000; } 100% { background-color: #1a0000; } }
 
         #pin-pad-container {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -106,7 +92,7 @@
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: black; z-index: 600; padding: 40px 20px; flex-direction: column; align-items: center;
         }
-        .log-list { width: 100%; max-width: 400px; height: 60vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; color: #fff;}
+        .log-list { width: 100%; max-width: 400px; height: 60vh; overflow-y: auto; background: #111; border: 1px solid #333; margin: 20px 0; padding: 10px; }
         .log-item { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; }
         
         #motion-canvas { display: none; }
@@ -142,20 +128,6 @@
         <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad('alarm')">Problem gelöst</button>
     </div>
 
-    <div id="overlay-maintenance" class="full-overlay">
-        <svg style="width:100px; height:100px; fill:black; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.45L19.53 19H4.47L12 5.45zM11 16h2v2h-2v-2zm0-7h2v5h-2V9z"/></svg>
-        <h2 style="font-size: 2.8rem; font-weight: 800; margin: 0;">BAUARBEITEN</h2>
-        <p style="font-size: 1.4rem; max-width: 80%; color: black;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
-        <button class="btn-ui" style="margin-top: 40px; background: black; color: white;" onclick="showPinPad('maintenance')">Reaktivieren</button>
-    </div>
-
-    <div id="overlay-closed" class="full-overlay">
-        <svg style="width:100px; height:100px; fill:white; margin-bottom:20px;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <h2 style="font-size: 2.2rem; font-weight: 800;">Durchgangscenter geschlossen</h2>
-        <p style="font-size: 1.2rem; color: #bbb;">Das System ist momentan außer Betrieb. Bitte schaue später wieder vorbei.</p>
-        <button class="btn-ui" style="margin-top: 60px; border-color: #444;" onclick="showPinPad('closed')">Reaktivieren</button>
-    </div>
-
     <div id="pin-pad-container">
         <div class="pin-display" id="pin-dots"></div>
         <div class="numpad">
@@ -178,7 +150,7 @@
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
-        let helpInterval = null; // Für den Alarm-Sound
+        let helpInterval = null;
         let currentPin = "";
         let pinTarget = "";
         let lastActivity = Date.now();
@@ -190,18 +162,16 @@
 
         function wake() { 
             lastActivity = Date.now(); 
-            document.body.classList.remove('standby-dim');
             document.getElementById('reader-wrapper').classList.remove('blurred');
             document.getElementById('standby-clock').style.display = 'none';
         }
 
+        // Standby Check alle 1s
         setInterval(() => {
             const now = Date.now();
-            const wrapper = document.getElementById('reader-wrapper');
-            const clock = document.getElementById('standby-clock');
             if (isScanning && (now - lastActivity > 30000)) {
-                document.body.classList.add('standby-dim');
-                wrapper.classList.add('blurred');
+                document.getElementById('reader-wrapper').classList.add('blurred');
+                const clock = document.getElementById('standby-clock');
                 clock.style.display = 'block';
                 const d = new Date();
                 clock.innerText = d.getHours().toString().padStart(2,'0') + ":" + d.getMinutes().toString().padStart(2,'0');
@@ -216,11 +186,11 @@
                 if (prevFrameData) {
                     let diff = 0;
                     for (let i = 0; i < frameData.length; i += 4) {
-                        const brightnessNow = frameData[i] + frameData[i+1] + frameData[i+2];
-                        const brightnessPrev = prevFrameData[i] + prevFrameData[i+1] + prevFrameData[i+2];
-                        if (Math.abs(brightnessNow - brightnessPrev) > 40) diff++;
+                        const bN = frameData[i] + frameData[i+1] + frameData[i+2];
+                        const bP = prevFrameData[i] + prevFrameData[i+1] + prevFrameData[i+2];
+                        if (Math.abs(bN - bP) > 40) diff++;
                     }
-                    if (diff > 180) wake();
+                    if (diff > 150) wake();
                 }
                 prevFrameData = frameData;
             }
@@ -238,31 +208,25 @@
             } catch(e){}
         }
 
-        // Mitarbeiter-Ruf aktivieren
-        function openHelp() { 
-            isScanning = false; 
-            document.getElementById('overlay-help').style.display = 'flex'; 
-            // Alarm Sound starten (alle 1.2 Sekunden)
-            if(!helpInterval) {
-                helpInterval = setInterval(() => playSound(600, 0.4), 1200);
-            }
-        }
-
         function handleTouchStart(e) {
             wake();
             if (e.touches.length === 3) {
-                touchTimer = setTimeout(() => {
-                    isScanning = false;
-                    document.getElementById('overlay-closed').style.display = 'flex';
-                }, 2000);
+                touchTimer = setTimeout(() => { isScanning = false; alert("Sicherheits-Verschluss aktiviert"); }, 2000);
             }
         }
         function handleTouchEnd() { clearTimeout(touchTimer); }
 
         function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
+        
+        function openHelp() { 
+            isScanning = false; 
+            document.getElementById('overlay-help').style.display = 'flex'; 
+            if(!helpInterval) helpInterval = setInterval(() => playSound(600, 0.4), 1200);
+        }
+
         function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function showPinPad(t) { pinTarget = t; document.getElementById('pin-pad-container').style.display = 'flex'; }
-        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','maintenance','closed','history'].includes(pinTarget)) isScanning = true; clearPin(); }
+        function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','history'].includes(pinTarget)) isScanning = true; clearPin(); }
         function clearPin() { currentPin = ""; document.getElementById('pin-dots').innerText = ""; }
 
         function pressKey(n) {
@@ -271,15 +235,11 @@
             if (currentPin === "2014") {
                 document.getElementById('pin-pad-container').style.display = 'none';
                 if (pinTarget === "history") renderLogs();
-                if (pinTarget === "maintenance") document.getElementById('overlay-maintenance').style.display = 'none';
-                if (pinTarget === "closed") document.getElementById('overlay-closed').style.display = 'none';
                 if (pinTarget === "alarm") {
-                    clearInterval(helpInterval); // Alarm stoppen!
-                    helpInterval = null;
+                    clearInterval(helpInterval); helpInterval = null;
                     document.getElementById('overlay-help').style.display = 'none';
                 }
-                if (pinTarget !== "history") isScanning = true;
-                wake(); clearPin();
+                isScanning = true; wake(); clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
         }
 
@@ -291,7 +251,6 @@
                 playSound(880, 0.6); ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
                 document.getElementById('res-text').innerText = "Zutritt gewährt!";
-                // Log speichern
                 let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
                 logs.unshift(new Date().toLocaleString('de-DE'));
                 if(logs.length > 50) logs.pop();
@@ -315,10 +274,7 @@
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
             wake();
             if (!isScanning) return;
-            const val = text.trim();
-            if (val === "Bauarbeiten") { isScanning = false; document.getElementById('overlay-maintenance').style.display = 'flex'; }
-            else if (val === "Schließen") { isScanning = false; document.getElementById('overlay-closed').style.display = 'flex'; }
-            else if (val.toLowerCase().includes("boxenjob")) showFeedback(true);
+            if (text.trim().toLowerCase().includes("boxenjob")) showFeedback(true);
             else showFeedback(false);
         }).then(() => { detectMotion(); });
     </script>
