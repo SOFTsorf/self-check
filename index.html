@@ -227,12 +227,14 @@
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
+                // Richtig
                 playSound(880, 0.6); 
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
                 document.getElementById('res-text').innerText = "Zutritt gewährt!";
                 saveLog();
             } else {
+                // Falsch
                 playSound(150, 0.7);
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
@@ -241,8 +243,16 @@
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
         }
 
+        // HIER WAR DER FEHLER: Jetzt wird auch "else" geprüft!
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
-            if (isScanning && text.toLowerCase().includes("boxenjob")) showFeedback(true);
+            if (!isScanning) return;
+            const scanned = text.trim().toLowerCase();
+            
+            if (scanned.includes("boxenjob")) {
+                showFeedback(true);
+            } else {
+                showFeedback(false); // Das fehlte vorher
+            }
         });
     </script>
 </body>
