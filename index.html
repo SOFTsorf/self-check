@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lahnstein SelfCheck</title>
+    <title>Durchgangscenter Lahnstein SelfCheck</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -16,7 +16,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             display: flex;
@@ -31,39 +31,40 @@
         .container {
             text-align: center;
             width: 90%;
-            max-width: 400px;
+            max-width: 450px;
+            z-index: 1;
         }
 
         h1 {
-            font-size: 1.5rem;
-            margin-bottom: 20px;
+            font-size: 1.6rem;
+            margin-bottom: 25px;
             color: var(--accent-color);
+            font-weight: 600;
         }
 
-        /* Scan-Bereich Styling */
+        /* Der Scan-Bereich */
         #reader {
             width: 100% !important;
             border: none !important;
-            border-radius: 20px;
+            border-radius: 30px; /* Schön abgerundet */
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
             background: var(--card-bg);
         }
 
-        /* Wir verstecken die Standard-Texte der Library */
-        #reader__dashboard, #reader__status_span {
+        /* Versteckt unnötige Buttons der Bibliothek */
+        #reader__dashboard, #reader__status_span, button {
             display: none !important;
         }
 
         .status-text {
-            margin-top: 20px;
-            font-size: 1.1rem;
+            margin-top: 25px;
+            font-size: 1.2rem;
+            color: #888;
             font-weight: 300;
-            letter-spacing: 1px;
-            color: #bbb;
         }
 
-        /* Overlay für Erfolg/Fehler */
+        /* Overlay für die 5-Sekunden Meldung */
         #overlay {
             display: none;
             position: fixed;
@@ -71,29 +72,31 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 10;
+            z-index: 999;
             justify-content: center;
             align-items: center;
             flex-direction: column;
             text-align: center;
-            animation: fadeIn 0.3s ease-in-out;
+            animation: fadeIn 0.4s ease-out;
         }
 
         .overlay-content h2 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 3rem;
+            margin: 0 0 15px 0;
+            font-weight: 800;
         }
 
         .overlay-content p {
-            font-size: 1.2rem;
+            font-size: 1.4rem;
+            padding: 0 20px;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
         }
 
-        /* Hilfsklasse für Video-Zentrierung */
+        /* Verhindert graue Ränder im Video */
         video {
             object-fit: cover !important;
         }
@@ -117,7 +120,9 @@
     </div>
 
     <script>
-        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code";
+        // Die Ziel-URL (wird automatisch bereinigt für den Vergleich)
+        const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
+        
         const overlay = document.getElementById('overlay');
         const overlayTitle = document.getElementById('overlay-title');
         const overlayText = document.getElementById('overlay-text');
@@ -125,13 +130,17 @@
         const statusMsg = document.getElementById('status-message');
 
         let isScanning = true;
-
         const html5QrCode = new Html5Qrcode("reader");
 
+        // Diese Funktion wird aufgerufen, wenn ein Code erkannt wird
         const qrCodeSuccessCallback = (decodedText) => {
             if (!isScanning) return;
 
-            if (decodedText.trim() === targetUrl) {
+            // Bereinigung des gescannten Textes
+            const scanned = decodedText.trim().toLowerCase();
+            
+            // Vergleich: Exakt gleich ODER mit Schrägstrich am Ende
+            if (scanned === targetUrl || scanned === targetUrl + "/") {
                 showFeedback(true);
             } else {
                 showFeedback(false);
@@ -140,20 +149,20 @@
 
         function showFeedback(isValid) {
             isScanning = false;
-            mainUI.style.display = 'none';
+            mainUI.style.opacity = '0'; // UI ausblenden
             overlay.style.display = 'flex';
 
             if (isValid) {
                 overlay.style.backgroundColor = "var(--success-color)";
                 overlayTitle.innerText = "GÜLTIG";
-                overlayText.innerText = "Der QR-Code ist gültig. Sie dürfen jetzt durchgehen!";
+                overlayText.innerText = "QR-Code akzeptiert.\nSie dürfen jetzt durchgehen!";
             } else {
                 overlay.style.backgroundColor = "var(--error-color)";
                 overlayTitle.innerText = "UNGÜLTIG";
-                overlayText.innerText = "Zutritt verweigert. Falscher QR-Code.";
+                overlayText.innerText = "Keine Berechtigung.\nBitte nutzen Sie einen gültigen Code.";
             }
 
-            // Nach 5 Sekunden zurücksetzen
+            // Nach 5 Sekunden alles zurücksetzen
             setTimeout(() => {
                 resetScanner();
             }, 5000);
@@ -161,23 +170,25 @@
 
         function resetScanner() {
             overlay.style.display = 'none';
-            mainUI.style.display = 'block';
+            mainUI.style.opacity = '1';
             isScanning = true;
             statusMsg.innerText = "QR-Code einscannen...";
         }
 
+        // Scanner Einstellungen
         const config = { 
-            fps: 15, 
-            qrbox: { width: 200, height: 200 },
+            fps: 20, 
+            qrbox: { width: 250, height: 250 }, // Quadratischer Scan-Bereich
             aspectRatio: 1.0 
         };
 
+        // Startet die Kamera automatisch
         html5QrCode.start(
             { facingMode: "environment" }, 
             config, 
             qrCodeSuccessCallback
         ).catch(err => {
-            statusMsg.innerText = "Kamera-Fehler: Bitte Zugriff erlauben.";
+            statusMsg.innerText = "Kamera konnte nicht gestartet werden.";
             statusMsg.style.color = "var(--error-color)";
         });
     </script>
