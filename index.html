@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk</title>
+    <title>DL SelfCheck Kiosk Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -30,10 +30,9 @@
             overflow: hidden;
         }
 
-        .header { text-align: center; }
+        .header { text-align: center; z-index: 10; }
         .camera-icon { width: 60px; height: 60px; fill: var(--accent-blue); margin-bottom: 10px; }
         h1 { font-size: 2.2rem; margin: 5px 0; font-weight: 700; }
-        .subtitle { font-size: 1rem; color: #888; margin-bottom: 10px; }
 
         #reader-wrapper {
             position: relative;
@@ -44,7 +43,6 @@
             overflow: hidden;
             background: #111;
         }
-
         #reader { width: 100% !important; height: 100% !important; }
         #reader__dashboard, #reader__status_span, video + div { display: none !important; }
 
@@ -56,80 +54,69 @@
             border-radius: 25px;
             font-size: 1rem;
             cursor: pointer;
+            z-index: 10;
         }
+        .footer-link { color: #777; text-decoration: underline; font-size: 0.9rem; background: none; border: none; cursor: pointer; }
 
-        .footer-link {
-            color: #777;
-            text-decoration: underline;
-            font-size: 0.9rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-        }
-
-        /* Overlays */
         .full-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 9999;
+            z-index: 100;
             justify-content: center; align-items: center;
             flex-direction: column; text-align: center;
             background: black;
         }
 
-        #overlay-result h2 { font-size: 3.5rem; margin: 0; font-weight: 800; }
-
-        /* Hilfe Seite */
-        #overlay-help { background-color: #1a0000; animation: pulse-red 2s infinite; }
+        #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red {
             0% { background-color: #1a0000; }
-            50% { background-color: #440000; }
+            50% { background-color: #660000; }
             100% { background-color: #1a0000; }
         }
 
-        /* PIN Tastatur Styling */
         #pin-pad-container {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95);
-            z-index: 10000;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 200;
             flex-direction: column;
             justify-content: center;
             align-items: center;
         }
 
         .pin-display {
-            font-size: 2rem;
-            letter-spacing: 10px;
-            margin-bottom: 20px;
-            height: 40px;
+            font-size: 2.5rem;
+            letter-spacing: 12px;
+            margin-bottom: 30px;
+            height: 50px;
             color: var(--accent-blue);
+            font-weight: bold;
         }
 
         .numpad {
             display: grid;
-            grid-template-columns: repeat(3, 80px);
-            gap: 15px;
+            grid-template-columns: repeat(3, 85px);
+            gap: 20px;
         }
 
         .key {
-            width: 80px;
-            height: 80px;
+            width: 85px;
+            height: 85px;
             background: var(--key-bg);
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: bold;
             border: 1px solid #333;
             cursor: pointer;
         }
-
-        .key:active { background: #444; }
-        .key.cancel { background: #441111; font-size: 1rem; }
+        .key:active { background: #555; }
+        .key.action { background: #333; font-size: 1.2rem; color: #bbb; }
+        .key.cancel { color: var(--error-red); }
 
         video { object-fit: cover !important; }
     </style>
@@ -141,7 +128,6 @@
             <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
         </svg>
         <h1>DL SelfCheck</h1>
-        <p class="subtitle">QR-Code scannen</p>
         <button id="fs-btn" class="btn-ui" onclick="toggleFullScreen()">Vollbild aktivieren</button>
     </div>
 
@@ -152,13 +138,13 @@
     <button class="footer-link" onclick="openHelp()">Probleme beim Scannen?</button>
 
     <div id="overlay-result" class="full-overlay">
-        <h2 id="res-title"></h2>
-        <p id="res-text"></p>
+        <h2 id="res-title" style="font-size: 3.5rem; font-weight: 800;"></h2>
+        <p id="res-text" style="font-size: 1.5rem;"></p>
     </div>
 
     <div id="overlay-help" class="full-overlay">
-        <h2 style="font-size: 2rem; color: var(--error-red);">Mitarbeiter gerufen!</h2>
-        <p>Bitte warten Sie am Terminal.</p>
+        <h2 style="font-size: 2.2rem; color: var(--error-red); margin-bottom: 10px;">MITARBEITER GERUFEN!</h2>
+        <p style="font-size: 1.2rem;">Bitte warten Sie am Terminal.</p>
         <button class="btn-ui" style="margin-top: 40px; background: #333;" onclick="showPinPad()">Problem gelöst</button>
     </div>
 
@@ -174,9 +160,9 @@
             <div class="key" onclick="pressKey('7')">7</div>
             <div class="key" onclick="pressKey('8')">8</div>
             <div class="key" onclick="pressKey('9')">9</div>
-            <div class="key cancel" onclick="closePinPad()">X</div>
+            <div class="key action cancel" onclick="closePinPad()">X</div>
             <div class="key" onclick="pressKey('0')">0</div>
-            <div class="key cancel" onclick="clearPin()">C</div>
+            <div class="key action" onclick="clearPin()">C</div>
         </div>
     </div>
 
@@ -184,26 +170,34 @@
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
-        let torchActive = false;
         let helpInterval = null;
         let currentPin = "";
         let audioCtx = null;
 
-        function getAudioCtx() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+        function getAudioCtx() { 
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+            return audioCtx; 
+        }
 
+        // Maximale Lautstärke-Funktion
         function playSound(freq, type, duration, vol) {
             const ctx = getAudioCtx();
             const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
-            gain.gain.setValueAtTime(vol, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(); osc.stop(ctx.currentTime + duration);
-        }
+            const gainNode = ctx.createGain();
 
-        // Wake Lock
-        if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(console.error); }
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            
+            // Volle Aussteuerung
+            gainNode.gain.setValueAtTime(vol, ctx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        }
 
         function toggleFullScreen() {
             if (!document.fullscreenElement) {
@@ -212,11 +206,11 @@
             }
         }
 
-        // Hilfe & PIN Logik
         function openHelp() {
             isScanning = false;
             document.getElementById('overlay-help').style.display = 'flex';
-            helpInterval = setInterval(() => { playSound(440, 'triangle', 0.3, 0.05); }, 1500);
+            // Aggressiverer Alarm (Sägezahn-Welle ist lauter/schärfer)
+            helpInterval = setInterval(() => { playSound(600, 'sawtooth', 0.4, 0.3); }, 1200);
         }
 
         function showPinPad() { document.getElementById('pin-pad-container').style.display = 'flex'; }
@@ -237,55 +231,35 @@
             }
         }
 
-        function updatePinDisplay() {
-            document.getElementById('pin-dots').innerText = "*".repeat(currentPin.length);
-        }
+        function updatePinDisplay() { document.getElementById('pin-dots').innerText = "•".repeat(currentPin.length); }
 
-        // Blitz Automaik
-        function checkBrightness() {
-            const video = document.querySelector('video');
-            if (!video || !isScanning) return;
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 50; canvas.height = 50;
-            ctx.drawImage(video, 0, 0, 50, 50);
-            const data = ctx.getImageData(0,0,50,50).data;
-            let sum = 0;
-            for(let i=0; i<data.length; i+=4) sum += (data[i]+data[i+1]+data[i+2])/3;
-            const avg = sum / (50*50);
-            if (avg < 45 && !torchActive) setTorch(true);
-            else if (avg > 80 && torchActive) setTorch(false);
-        }
-
-        async function setTorch(on) {
-            try { await html5QrCode.applyVideoConstraints({advanced: [{torch: on}]}); torchActive = on; } catch(e){}
-        }
-
-        // Scanner Feedback
         function showFeedback(isValid) {
             isScanning = false;
             const ov = document.getElementById('overlay-result');
             ov.style.display = 'flex';
             if (isValid) {
-                playSound(880, 'sine', 0.5, 0.1); // Erfolg
+                playSound(880, 'sine', 0.6, 0.4); // Lauter Ping
                 ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
                 document.getElementById('res-text').innerText = "Zutritt gewährt!";
             } else {
-                playSound(120, 'sawtooth', 0.6, 0.1); // Fehler
+                // Lauter dreifach Buzzer
+                playSound(150, 'sawtooth', 0.7, 0.5);
+                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.5), 1000);
+                setTimeout(() => playSound(150, 'sawtooth', 0.7, 0.5), 2000);
                 ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
-                document.getElementById('res-text').innerText = "Bitte Mitarbeiter rufen.";
+                document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
             }
-            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 5000);
+            setTimeout(() => { ov.style.display = 'none'; isScanning = true; }, 4000);
         }
 
-        const config = { fps: 20, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0 };
+        const config = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
         html5QrCode.start({ facingMode: "environment" }, config, (text) => {
             if (!isScanning) return;
             const scanned = text.trim().toLowerCase();
             showFeedback(scanned === targetUrl || scanned === targetUrl + "/");
-        }).then(() => { setInterval(checkBrightness, 2500); });
+        });
     </script>
 </body>
 </html>
