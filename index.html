@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>DL SelfCheck Kiosk Pro - Battery Saver</title>
+    <title>DL SelfCheck Kiosk Pro - Fixed Alarm</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -30,10 +30,9 @@
             box-sizing: border-box;
             overflow: hidden;
             touch-action: none;
-            transition: opacity 0.5s ease; /* Sanftes Aufwachen/Dimmen */
+            transition: opacity 0.5s ease;
         }
 
-        /* Akku-Schonmodus: Körper wird im Standby gedimmt */
         body.standby-dim { opacity: 0.3; }
 
         .header { text-align: center; z-index: 10; width: 100%; position: relative; }
@@ -48,8 +47,6 @@
             overflow: hidden; background: #111;
             transition: filter 0.6s ease, opacity 0.6s ease;
         }
-
-        /* Blur und starke Transparenz im Standby */
         #reader-wrapper.blurred { filter: blur(30px) grayscale(1); opacity: 0.2; }
 
         #standby-clock {
@@ -82,7 +79,17 @@
             flex-direction: column; text-align: center; background: black; padding: 30px;
         }
 
-        #overlay-help { background-color: #1a0000; animation: pulse-red 1.5s infinite; }
+        /* Mitarbeiter-Hilfe Overlay mit Pulsieren */
+        #overlay-help { 
+            background-color: #1a0000; 
+            animation: pulse-red 1.5s infinite; 
+        }
+        @keyframes pulse-red { 
+            0% { background-color: #1a0000; } 
+            50% { background-color: #660000; } 
+            100% { background-color: #1a0000; } 
+        }
+
         #overlay-maintenance { background-color: var(--warning-orange); color: black; z-index: 210; }
         #overlay-closed { background-color: black; color: white; z-index: 220; }
 
@@ -171,12 +178,12 @@
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code".toLowerCase().trim();
         const html5QrCode = new Html5Qrcode("reader");
         let isScanning = true;
+        let helpInterval = null; // Für den Alarm-Sound
         let currentPin = "";
         let pinTarget = "";
         let lastActivity = Date.now();
         let touchTimer = null;
 
-        // Motion Detection
         const motionCanvas = document.getElementById('motion-canvas');
         const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
         let prevFrameData = null;
@@ -188,7 +195,6 @@
             document.getElementById('standby-clock').style.display = 'none';
         }
 
-        // Standby & Akku-Saver Check
         setInterval(() => {
             const now = Date.now();
             const wrapper = document.getElementById('reader-wrapper');
@@ -214,37 +220,11 @@
                         const brightnessPrev = prevFrameData[i] + prevFrameData[i+1] + prevFrameData[i+2];
                         if (Math.abs(brightnessNow - brightnessPrev) > 40) diff++;
                     }
-                    if (diff > 180) wake(); // Sensibilität leicht erhöht für Akku-Modus
+                    if (diff > 180) wake();
                 }
                 prevFrameData = frameData;
             }
             requestAnimationFrame(detectMotion);
-        }
-
-        function handleTouchStart(e) {
-            wake();
-            if (e.touches.length === 3) {
-                touchTimer = setTimeout(() => {
-                    isScanning = false;
-                    document.getElementById('overlay-closed').style.display = 'flex';
-                }, 2000);
-            }
-        }
-        function handleTouchEnd() { clearTimeout(touchTimer); }
-
-        function saveLog() {
-            let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            logs.unshift(new Date().toLocaleString('de-DE'));
-            if(logs.length > 50) logs.pop();
-            localStorage.setItem('scanLogs', JSON.stringify(logs));
-        }
-
-        function renderLogs() {
-            const list = document.getElementById('log-list');
-            list.innerHTML = "";
-            let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
-            logs.forEach(time => list.innerHTML += `<div class="log-item"><span>Check-In</span> <span>${time}</span></div>`);
-            document.getElementById('history-overlay').style.display = 'flex';
         }
 
         function playSound(f, d) {
@@ -258,8 +238,28 @@
             } catch(e){}
         }
 
+        // Mitarbeiter-Ruf aktivieren
+        function openHelp() { 
+            isScanning = false; 
+            document.getElementById('overlay-help').style.display = 'flex'; 
+            // Alarm Sound starten (alle 1.2 Sekunden)
+            if(!helpInterval) {
+                helpInterval = setInterval(() => playSound(600, 0.4), 1200);
+            }
+        }
+
+        function handleTouchStart(e) {
+            wake();
+            if (e.touches.length === 3) {
+                touchTimer = setTimeout(() => {
+                    isScanning = false;
+                    document.getElementById('overlay-closed').style.display = 'flex';
+                }, 2000);
+            }
+        }
+        function handleTouchEnd() { clearTimeout(touchTimer); }
+
         function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); document.getElementById('fs-btn').style.display = 'none'; }
-        function openHelp() { isScanning = false; document.getElementById('overlay-help').style.display = 'flex'; }
         function openHistoryRequest() { pinTarget = "history"; isScanning = false; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function showPinPad(t) { pinTarget = t; document.getElementById('pin-pad-container').style.display = 'flex'; }
         function closePinPad() { document.getElementById('pin-pad-container').style.display = 'none'; if(!['alarm','maintenance','closed','history'].includes(pinTarget)) isScanning = true; clearPin(); }
@@ -273,7 +273,11 @@
                 if (pinTarget === "history") renderLogs();
                 if (pinTarget === "maintenance") document.getElementById('overlay-maintenance').style.display = 'none';
                 if (pinTarget === "closed") document.getElementById('overlay-closed').style.display = 'none';
-                if (pinTarget === "alarm") document.getElementById('overlay-help').style.display = 'none';
+                if (pinTarget === "alarm") {
+                    clearInterval(helpInterval); // Alarm stoppen!
+                    helpInterval = null;
+                    document.getElementById('overlay-help').style.display = 'none';
+                }
                 if (pinTarget !== "history") isScanning = true;
                 wake(); clearPin();
             } else if (currentPin.length >= 4) setTimeout(clearPin, 300);
@@ -287,13 +291,25 @@
                 playSound(880, 0.6); ov.style.backgroundColor = "var(--success-green)";
                 document.getElementById('res-title').innerText = "GÜLTIG";
                 document.getElementById('res-text').innerText = "Zutritt gewährt!";
-                saveLog();
+                // Log speichern
+                let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
+                logs.unshift(new Date().toLocaleString('de-DE'));
+                if(logs.length > 50) logs.pop();
+                localStorage.setItem('scanLogs', JSON.stringify(logs));
             } else {
                 playSound(150, 0.7); ov.style.backgroundColor = "var(--error-red)";
                 document.getElementById('res-title').innerText = "UNGÜLTIG";
                 document.getElementById('res-text').innerText = "Mitarbeiter rufen!";
             }
             setTimeout(() => { ov.style.display = 'none'; isScanning = true; wake(); }, 4000);
+        }
+
+        function renderLogs() {
+            const list = document.getElementById('log-list');
+            list.innerHTML = "";
+            let logs = JSON.parse(localStorage.getItem('scanLogs') || '[]');
+            logs.forEach(time => list.innerHTML += `<div class="log-item"><span>Check-In</span> <span>${time}</span></div>`);
+            document.getElementById('history-overlay').style.display = 'flex';
         }
 
         html5QrCode.start({ facingMode: "environment" }, { fps: 20, aspectRatio: 1.0 }, (text) => {
