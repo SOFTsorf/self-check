@@ -3,86 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Durchgangscenter Lahnstein SelfCheck</title>
+    <title>Lahnstein SelfCheck</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --accent-color: #3498db;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f2f5;
-        }
-        #reader {
-            width: 100%;
-            max-width: 500px;
-            border: 2px solid #333;
-            border-radius: 8px;
             overflow: hidden;
         }
-        #result-container {
-            display: none;
+
+        .container {
             text-align: center;
-            padding: 20px;
-            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--accent-color);
+        }
+
+        /* Scan-Bereich Styling */
+        #reader {
+            width: 100% !important;
+            border: none !important;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: var(--card-bg);
+        }
+
+        /* Wir verstecken die Standard-Texte der Library */
+        #reader__dashboard, #reader__status_span {
+            display: none !important;
+        }
+
+        .status-text {
             margin-top: 20px;
+            font-size: 1.1rem;
+            font-weight: 300;
+            letter-spacing: 1px;
+            color: #bbb;
         }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
+
+        /* Overlay für Erfolg/Fehler */
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            animation: fadeIn 0.3s ease-in-out;
         }
-        h1 { color: #333; }
+
+        .overlay-content h2 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .overlay-content p {
+            font-size: 1.2rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Hilfsklasse für Video-Zentrierung */
+        video {
+            object-fit: cover !important;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Durchgangscenter Lahnstein SelfCheck</h1>
-    
-    <div id="reader"></div>
+    <div class="container" id="main-ui">
+        <h1>Durchgangscenter Lahnstein</h1>
+        
+        <div id="reader"></div>
+        
+        <p class="status-text" id="status-message">QR-Code einscannen...</p>
+    </div>
 
-    <div id="result-container" class="success">
-        <h2>Der QR-Code ist gültig.</h2>
-        <p>Sie dürfen jetzt durchgehen!</p>
+    <div id="overlay">
+        <div class="overlay-content">
+            <h2 id="overlay-title"></h2>
+            <p id="overlay-text"></p>
+        </div>
     </div>
 
     <script>
         const targetUrl = "https://boxenjob.jimdosite.com/gueltiger-qr-code";
-        const readerElement = document.getElementById('reader');
-        const resultContainer = document.getElementById('result-container');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayText = document.getElementById('overlay-text');
+        const mainUI = document.getElementById('main-ui');
+        const statusMsg = document.getElementById('status-message');
+
+        let isScanning = true;
 
         const html5QrCode = new Html5Qrcode("reader");
 
-        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-            // Überprüfung der URL
+        const qrCodeSuccessCallback = (decodedText) => {
+            if (!isScanning) return;
+
             if (decodedText.trim() === targetUrl) {
-                handleSuccess();
+                showFeedback(true);
+            } else {
+                showFeedback(false);
             }
         };
 
-        function handleSuccess() {
-            // Scanner stoppen
-            html5QrCode.stop().then(() => {
-                // UI anpassen
-                readerElement.style.display = 'none';
-                resultContainer.style.display = 'block';
+        function showFeedback(isValid) {
+            isScanning = false;
+            mainUI.style.display = 'none';
+            overlay.style.display = 'flex';
 
-                // Nach 5 Sekunden zurücksetzen
-                setTimeout(() => {
-                    location.reload(); // Einfachste Methode zum Neustart
-                }, 5000);
-            }).catch((err) => {
-                console.error("Fehler beim Stoppen des Scanners", err);
-            });
+            if (isValid) {
+                overlay.style.backgroundColor = "var(--success-color)";
+                overlayTitle.innerText = "GÜLTIG";
+                overlayText.innerText = "Der QR-Code ist gültig. Sie dürfen jetzt durchgehen!";
+            } else {
+                overlay.style.backgroundColor = "var(--error-color)";
+                overlayTitle.innerText = "UNGÜLTIG";
+                overlayText.innerText = "Zutritt verweigert. Falscher QR-Code.";
+            }
+
+            // Nach 5 Sekunden zurücksetzen
+            setTimeout(() => {
+                resetScanner();
+            }, 5000);
         }
 
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        function resetScanner() {
+            overlay.style.display = 'none';
+            mainUI.style.display = 'block';
+            isScanning = true;
+            statusMsg.innerText = "QR-Code einscannen...";
+        }
 
-        // Startet die Kamera
-        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+        const config = { 
+            fps: 15, 
+            qrbox: { width: 200, height: 200 },
+            aspectRatio: 1.0 
+        };
+
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            qrCodeSuccessCallback
+        ).catch(err => {
+            statusMsg.innerText = "Kamera-Fehler: Bitte Zugriff erlauben.";
+            statusMsg.style.color = "var(--error-color)";
+        });
     </script>
 </body>
 </html>
