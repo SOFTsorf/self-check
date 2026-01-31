@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Lahnstein SelfCheck</title>
+    <title>DL SelfCheck</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -29,22 +28,23 @@
             box-sizing: border-box;
         }
 
-        /* Header wie im Screenshot */
         .header {
             text-align: center;
         }
 
-        .blue-icon {
-            font-size: 50px;
-            color: var(--accent-blue);
-            margin-bottom: 20px;
-            display: inline-block;
+        /* Das blaue Kamera-Icon (SVG) */
+        .camera-icon {
+            width: 60px;
+            height: 60px;
+            fill: var(--accent-blue);
+            margin-bottom: 15px;
         }
 
         h1 {
-            font-size: 1.8rem;
-            margin: 10px 0;
+            font-size: 2.2rem;
+            margin: 5px 0;
             font-weight: 700;
+            letter-spacing: -1px;
         }
 
         .subtitle {
@@ -55,13 +55,12 @@
             line-height: 1.5;
         }
 
-        /* Scan-Bereich (Abgerundet mit blauem Rahmen) */
         #reader-wrapper {
             position: relative;
-            width: 260px;
-            height: 260px;
+            width: 270px;
+            height: 270px;
             border: 4px solid var(--accent-blue);
-            border-radius: 45px;
+            border-radius: 50px;
             overflow: hidden;
             background: #111;
         }
@@ -71,12 +70,10 @@
             height: 100% !important;
         }
 
-        /* Blendet Library-UI aus */
         #reader__dashboard, #reader__status_span, video + div {
             display: none !important;
         }
 
-        /* Hilfe-Link ganz unten */
         .footer-link {
             color: #777;
             text-decoration: underline;
@@ -87,7 +84,6 @@
             margin-bottom: 20px;
         }
 
-        /* Overlays */
         #overlay {
             display: none;
             position: fixed;
@@ -100,16 +96,10 @@
             align-items: center;
             flex-direction: column;
             text-align: center;
-            animation: fadeIn 0.2s ease-in;
         }
 
         #overlay h2 { font-size: 3.5rem; margin: 0; font-weight: 800; }
         #overlay p { font-size: 1.3rem; padding: 20px; max-width: 80%; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
 
         video { object-fit: cover !important; }
     </style>
@@ -117,9 +107,11 @@
 <body>
 
     <div class="header">
-        <div class="blue-icon">🔗</div>
-        <h1>Herstellen einer Verbindung</h1>
-        <p class="subtitle">Scanne den QR-Code auf deinem Ticket oder Smartphone.</p>
+        <svg class="camera-icon" viewBox="0 0 24 24">
+            <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-4h-2.17l-1.19-1.32c-.39-.42-.94-.68-1.53-.68H9.89c-.58 0-1.14.26-1.53.68L7.17 7H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-7 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+        </svg>
+        <h1>DL SelfCheck</h1>
+        <p class="subtitle">Scanne den QR-Code ein...</p>
     </div>
 
     <div id="reader-wrapper">
@@ -141,23 +133,30 @@
         const overlay = document.getElementById('overlay');
         let isScanning = true;
 
-        // Funktion zum Erzeugen eines Tons ohne Datei
-        function playErrorSound() {
+        // Erzeugt einen einzelnen Fehler-Ton
+        function playSingleBuzzer() {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
             const gain = context.createGain();
 
-            oscillator.type = 'sawtooth'; // Klingt nach "Buzzer"
-            oscillator.frequency.setValueAtTime(150, context.currentTime); // Tiefer Ton
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(120, context.currentTime); 
             
             gain.gain.setValueAtTime(0.1, context.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
+            gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.6);
 
             oscillator.connect(gain);
             gain.connect(context.destination);
 
             oscillator.start();
-            oscillator.stop(context.currentTime + 0.5);
+            oscillator.stop(context.currentTime + 0.6);
+        }
+
+        // Spielt den Ton 3 Mal im Abstand von 1 Sekunde
+        function playTripleBuzzer() {
+            playSingleBuzzer();
+            setTimeout(playSingleBuzzer, 1000);
+            setTimeout(playSingleBuzzer, 2000);
         }
 
         function showFeedback(isValid) {
@@ -169,13 +168,12 @@
                 document.getElementById('overlay-title').innerText = "GÜLTIG";
                 document.getElementById('overlay-text').innerText = "Sie dürfen jetzt durchgehen!";
             } else {
-                playErrorSound(); // Synthetischer Sound
+                playTripleBuzzer(); 
                 overlay.style.backgroundColor = "var(--error-red)";
                 document.getElementById('overlay-title').innerText = "UNGÜLTIG";
                 document.getElementById('overlay-text').innerText = "Bitte wenden Sie sich an einen Mitarbeiter.";
             }
 
-            // Nach 5 Sekunden zum Scan zurückkehren
             setTimeout(() => {
                 overlay.style.display = 'none';
                 isScanning = true;
@@ -192,17 +190,8 @@
             }
         };
 
-        const config = { 
-            fps: 20, 
-            qrbox: { width: 260, height: 260 },
-            aspectRatio: 1.0 
-        };
-
-        // Startet Kamera
-        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
-        .catch(err => {
-            console.error("Kamerafehler", err);
-        });
+        const config = { fps: 20, qrbox: { width: 270, height: 270 }, aspectRatio: 1.0 };
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
     </script>
 </body>
 </html>
