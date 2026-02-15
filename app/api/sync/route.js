@@ -1,10 +1,10 @@
 import admin from 'firebase-admin';
 import { NextResponse } from 'next/server';
 
-// Firebase Initialisierung (verhindert Mehrfach-Initialisierung)
+// Firebase Initialisierung
 if (!admin.apps.length) {
   admin.initializeApp({
-    // ERSETZE DIESE URL MIT DEINER FIREBASE URL:
+    // Hier fügst du nur deine Firebase URL ein:
     databaseURL: "https://durchagngssystem.firebaseio.com/" 
   });
 }
@@ -17,13 +17,15 @@ export async function GET() {
     const data = snapshot.val() || { status: 'active', logs: [] };
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json({ status: 'error', logs: [], msg: error.message });
+    console.error("Firebase GET Error:", error);
+    return NextResponse.json({ status: 'offline', logs: [] });
   }
 }
 
 export async function POST(request) {
   try {
-    const { action, value, logEntry } = await request.json();
+    const body = await request.json();
+    const { action, value, logEntry } = body;
 
     if (action === 'setStatus') {
       await db.ref('system/status').set(value);
@@ -35,7 +37,6 @@ export async function POST(request) {
         msg: logEntry 
       };
       
-      // Holen, Hinzufügen, Kürzen, Speichern
       const snapshot = await db.ref('system/logs').once('value');
       let logs = snapshot.val() || [];
       logs.unshift(newLog);
@@ -50,6 +51,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Firebase POST Error:", error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
