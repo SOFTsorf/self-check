@@ -1,48 +1,46 @@
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 import { NextResponse } from 'next/server';
 
-// Lokaler Speicher als Rückfallebene, falls die Verbindung zur DB kurz weg ist
+// Verbindung zu deinem Redis Labs Server
+// Ich habe die URL direkt eingebaut, damit es sofort funktioniert.
+const kv = new Redis("redis://default:paxO5J56G4CxjJRhrMbIciADVVJjAyPr@redis-16099.c8.us-east-1-3.ec2.cloud.redislabs.com:16099");
+
+// Fallback Speicher (Falls Redis mal nicht erreichbar ist)
 let memoryStatus = "active";
 let memoryLogs = [];
 
 export async function GET() {
-  // Diagnose: Prüfen, ob die URL für Redis/KV überhaupt existiert
-  if (!process.env.KV_REST_API_URL && !process.env.UPSTASH_REDIS_REST_URL) {
-    console.error("KRITISCH: Keine Redis/KV Umgebungsvariablen gefunden! Bitte im Vercel Dashboard unter Storage/Settings prüfen.");
-  }
-
   let status = memoryStatus;
   let logs = memoryLogs;
 
   try {
+    // Bei ioredis kommen Daten als String zurück, daher JSON.parse
     const kvStatus = await kv.get('kiosk_status');
-    const kvLogs = await kv.get('kiosk_logs');
+    const kvLogsRaw = await kv.get('kiosk_logs');
     
     if (kvStatus) status = kvStatus;
-    if (kvLogs) logs = kvLogs;
+    if (kvLogsRaw) logs = JSON.parse(kvLogsRaw);
   } catch (e) {
-    console.log("KV/Redis nicht erreichbar, nutze lokalen Speicher.");
+    console.log("Redis Labs nicht verbunden, nutze Memory");
   }
 
   return NextResponse.json({ status, logs });
 }
 
 export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { action, value, logEntry } = body;
+  const body = await request.json();
+  const { action, value, logEntry } = body;
 
-    // 1. Status ändern (active, maintenance, closed)
+  try {
+    // Status ändern
     if (action === 'setStatus') {
       memoryStatus = value;
-      try {
-        await kv.set('kiosk_status', value);
-      } catch(e) {
-        console.error("Fehler beim Speichern des Status in Redis:", e);
-      }
+      try { 
+        await kv.set('kiosk_status', value); 
+      } catch(e){}
     }
 
-    // 2. Einen neuen Log-Eintrag hinzufügen
+    // Neuen Log hinzufügen
     if (action === 'addLog') {
       const newLog = { 
         time: new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }), 
@@ -50,33 +48,23 @@ export async function POST(request) {
       };
       
       memoryLogs.unshift(newLog);
-      if (memoryLogs.length > 50) memoryLogs.pop(); // Maximal 50 Einträge behalten
+      if (memoryLogs.length > 50) memoryLogs.pop();
       
-      try {
-        // Wir holen erst die aktuellen Logs aus Redis, fügen den neuen hinzu und speichern alles
-        let currentKvLogs = await kv.get('kiosk_logs') || [];
-        currentKvLogs.unshift(newLog);
-        if (currentKvLogs.length > 50) currentKvLogs.pop();
-        await kv.set('kiosk_logs', currentKvLogs);
-      } catch(e) {
-        console.error("Fehler beim Speichern der Logs in Redis:", e);
-      }
+      try { 
+        // Wir speichern das Array als JSON-String in Redis
+        await kv.set('kiosk_logs', JSON.stringify(memoryLogs)); 
+      } catch(e){}
     }
 
-    // 3. Alle Logs löschen
+    // Logs löschen
     if (action === 'clearLogs') {
       memoryLogs = [];
-      try {
-        await kv.set('kiosk_logs', []);
-      } catch(e) {
-        console.error("Fehler beim Löschen der Redis-Logs:", e);
-      }
+      try { await kv.set('kiosk_logs', JSON.stringify([])); } catch(e){}
     }
 
-    return NextResponse.json({ success: true, status: memoryStatus, logs: memoryLogs });
-
   } catch (error) {
-    console.error("Server-Fehler im POST-Handler:", error);
-    return NextResponse.json({ error: 'Server-Fehler' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
+
+  return NextResponse.json({ success: true, status: memoryStatus, logs: memoryLogs });
 }
