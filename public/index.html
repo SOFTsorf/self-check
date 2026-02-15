@@ -224,10 +224,8 @@
 
         function handleTouchStart(e) {
             wake();
-            // Original touch logic maintained but manual close override is handled via remote check mostly now
             if (e.touches.length === 3) {
                 touchTimer = setTimeout(() => {
-                    // Manual trigger still works
                     uploadStatus('closed');
                 }, 2000);
             }
@@ -252,7 +250,6 @@
             if (currentPin === "2014") {
                 document.getElementById('pin-pad-container').style.display = 'none';
                 if (pinTarget === "history") renderLogs();
-                // Wenn PIN genutzt wird, um Wartung/Closed zu beenden, senden wir "Active" an den Server
                 if (pinTarget === "maintenance" || pinTarget === "closed") {
                     uploadStatus('active');
                     document.getElementById('overlay-maintenance').style.display = 'none';
@@ -279,8 +276,6 @@
                 logs.unshift(new Date().toLocaleString('de-DE'));
                 if(logs.length > 50) logs.pop();
                 localStorage.setItem('scanLogs', JSON.stringify(logs));
-                
-                // NEW: Send to Admin
                 uploadScanLog("Zutritt gewährt");
             } else {
                 playSound(150, 0.7); ov.style.backgroundColor = "var(--error-red)";
@@ -305,18 +300,14 @@
             wake();
             if (!isScanning) return;
             const val = text.trim();
-            // Lokale Befehle (Backup)
             if (val === "Bauarbeiten") { uploadStatus('maintenance'); }
             else if (val === "Schließen") { uploadStatus('closed'); }
             else if (val.toLowerCase().includes("boxenjob")) showFeedback(true);
             else showFeedback(false);
         }).then(() => { detectMotion(); });
 
-        /* =========================================
-           NEU: SERVER VERBINDUNG (ADMIN CONTROL)
-           ========================================= */
+        /* SERVER SYNC */
         const REMOTE_API = "/api/sync";
-        let localStatusOverride = false;
 
         async function uploadScanLog(msg) {
             try {
@@ -325,11 +316,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'addLog', logEntry: msg })
                 });
-            } catch(e) { console.error("Upload failed", e); }
+            } catch(e) {}
         }
 
         async function uploadStatus(newStatus) {
-            isScanning = (newStatus === 'active');
             updateLocalOverlays(newStatus);
             try {
                 await fetch(REMOTE_API, {
@@ -337,7 +327,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'setStatus', value: newStatus })
                 });
-            } catch(e) { console.error("Status upload failed", e); }
+            } catch(e) {}
         }
 
         function updateLocalOverlays(status) {
@@ -347,7 +337,9 @@
             if (status === 'active') {
                 om.style.display = 'none';
                 oc.style.display = 'none';
-                if(!document.getElementById('overlay-result').style.display || document.getElementById('overlay-result').style.display === 'none') {
+                if(document.getElementById('overlay-result').style.display !== 'flex' && 
+                   document.getElementById('overlay-help').style.display !== 'flex' &&
+                   document.getElementById('pin-pad-container').style.display !== 'flex') {
                     isScanning = true;
                 }
             } else if (status === 'maintenance') {
@@ -361,20 +353,16 @@
             }
         }
 
-        // Check Server Status every 5 seconds
         setInterval(async () => {
-            // Wenn wir gerade im PIN Menü sind, nicht stören
-            if(document.getElementById('pin-pad-container').style.display === 'flex') return;
+            if(document.getElementById('pin-pad-container').style.display === 'flex' || 
+               document.getElementById('overlay-help').style.display === 'flex' ||
+               document.getElementById('overlay-result').style.display === 'flex') return;
 
             try {
                 const res = await fetch(REMOTE_API);
                 const data = await res.json();
-                if(data.status) {
-                    // Prüfen ob sich Status geändert hat, um unnötiges Flackern zu vermeiden
-                    // Wir rufen updateLocalOverlays auf, das kümmert sich um die Logik
-                    updateLocalOverlays(data.status);
-                }
-            } catch(e) { console.log("Offline mode"); }
+                if(data.status) updateLocalOverlays(data.status);
+            } catch(e) {}
         }, 5000);
 
     </script>
