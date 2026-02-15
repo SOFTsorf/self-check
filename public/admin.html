@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>DL Admin Control</title>
+    <style>
+        :root { --bg: #050505; --card: #111; --text: #eee; --accent: #4c8bf5; --green: #2ecc71; --red: #e74c3c; --orange: #f39c12; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        h1 { margin-bottom: 30px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        
+        .status-card { background: var(--card); padding: 20px; border-radius: 15px; width: 100%; max-width: 400px; text-align: center; border: 1px solid #333; margin-bottom: 20px; }
+        .current-status { font-size: 2rem; font-weight: 800; margin: 10px 0; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; }
+        .btn { padding: 15px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; font-size: 0.9rem; }
+        .btn:active { transform: scale(0.95); }
+        .btn-active { background: var(--green); color: black; }
+        .btn-maint { background: var(--orange); color: black; }
+        .btn-closed { background: var(--red); color: white; }
+        .btn.selected { box-shadow: 0 0 15px currentColor; border: 2px solid white; }
+
+        .log-container { width: 100%; max-width: 400px; margin-top: 30px; }
+        .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .log-list { background: var(--card); border-radius: 10px; height: 300px; overflow-y: auto; border: 1px solid #333; }
+        .log-item { padding: 12px; border-bottom: 1px solid #222; font-size: 0.9rem; display: flex; justify-content: space-between; animation: flash 1s; }
+        .log-item.new { background: rgba(76, 139, 245, 0.2); }
+        
+        @keyframes flash { 0% { background-color: var(--accent); } 100% { background-color: transparent; } }
+
+        /* Login Overlay */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        input { font-size: 1.5rem; padding: 10px; text-align: center; background: #222; color: white; border: 1px solid #444; border-radius: 10px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <h2>Admin Login</h2>
+        <input type="password" id="pin-input" placeholder="PIN" maxlength="4">
+        <button class="btn btn-active" onclick="checkPin()">Entsperren</button>
+    </div>
+
+    <h1>System Status</h1>
+
+    <div class="status-card">
+        <div>Aktueller Modus</div>
+        <div id="display-status" class="current-status">LADEN...</div>
+        <div id="last-update" style="font-size: 0.8rem; color: #666;"></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-active" id="btn-active" onclick="setStatus('active')">AKTIV</button>
+        <button class="btn btn-maint" id="btn-maintenance" onclick="setStatus('maintenance')">BAU</button>
+        <button class="btn btn-closed" id="btn-closed" onclick="setStatus('closed')">ZU</button>
+    </div>
+
+    <div class="log-container">
+        <div class="log-header">
+            <h3>Live Protokoll</h3>
+            <button class="btn" style="background:#333; padding: 5px 10px;" onclick="clearLogs()">Löschen</button>
+        </div>
+        <div class="log-list" id="log-list">
+            <div style="padding:20px; text-align:center; color:#555;">Warte auf Daten...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api/sync';
+        let lastLogCount = 0;
+        let isFirstLoad = true;
+
+        function checkPin() {
+            if(document.getElementById('pin-input').value === '2014') {
+                document.getElementById('login-overlay').style.display = 'none';
+                startSync();
+            } else {
+                alert("Falsche PIN");
+                document.getElementById('pin-input').value = '';
+            }
+        }
+
+        async function setStatus(mode) {
+            // UI sofort updaten (optimistisch)
+            updateUI(mode);
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'setStatus', value: mode })
+            });
+            fetchData(); // Sync um sicherzugehen
+        }
+
+        async function clearLogs() {
+            if(!confirm("Logs wirklich löschen?")) return;
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'clearLogs' })
+            });
+            fetchData();
+        }
+
+        function updateUI(status) {
+            const disp = document.getElementById('display-status');
+            const btns = ['active', 'maintenance', 'closed'];
+            
+            btns.forEach(b => document.getElementById('btn-'+b).classList.remove('selected'));
+            document.getElementById('btn-'+status).classList.add('selected');
+
+            if(status === 'active') { disp.innerText = "OFFEN"; disp.style.color = "var(--green)"; }
+            if(status === 'maintenance') { disp.innerText = "BAUARBEITEN"; disp.style.color = "var(--orange)"; }
+            if(status === 'closed') { disp.innerText = "GESCHLOSSEN"; disp.style.color = "var(--red)"; }
+        }
+
+        function playNotificationSound() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.frequency.setValueAtTime(1000, ctx.currentTime);
+            o.type = 'sine';
+            g.gain.value = 0.1;
+            o.connect(g); g.connect(ctx.destination);
+            o.start(); o.stop(ctx.currentTime + 0.2);
+            setTimeout(() => {
+                const o2 = ctx.createOscillator(); 
+                o2.frequency.setValueAtTime(1500, ctx.currentTime);
+                o2.connect(g); o2.start(); o2.stop(ctx.currentTime + 0.2);
+            }, 100);
+        }
+
+        async function fetchData() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                
+                updateUI(data.status);
+                
+                const list = document.getElementById('log-list');
+                const currentCount = data.logs.length;
+
+                // Benachrichtigung wenn neue Logs und nicht erster Ladevorgang
+                if (!isFirstLoad && currentCount > lastLogCount) {
+                    playNotificationSound();
+                }
+
+                if (currentCount !== lastLogCount || isFirstLoad) {
+                    list.innerHTML = data.logs.map((l, index) => 
+                        `<div class="log-item ${index === 0 && !isFirstLoad ? 'new' : ''}">
+                            <span style="font-weight:bold; color:white;">${l.msg || 'Scan'}</span>
+                            <span style="color:#888;">${l.time}</span>
+                        </div>`
+                    ).join('');
+                    lastLogCount = currentCount;
+                }
+                
+                document.getElementById('last-update').innerText = "Sync: " + new Date().toLocaleTimeString();
+                isFirstLoad = false;
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function startSync() {
+            fetchData();
+            setInterval(fetchData, 3000); // Alle 3 Sekunden aktualisieren
+        }
+    </script>
+</body>
+</html>
