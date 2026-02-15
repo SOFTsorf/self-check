@@ -1,12 +1,11 @@
 import Redis from 'ioredis';
 import { NextResponse } from 'next/server';
 
-// Verbindung zu deinem Redis Labs Server
-// Ich habe die URL direkt eingebaut, damit es sofort funktioniert.
+// Verbindung zu deiner Redis Labs Instanz
 const kv = new Redis("redis://default:paxO5J56G4CxjJRhrMbIciADVVJjAyPr@redis-16099.c8.us-east-1-3.ec2.cloud.redislabs.com:16099");
 
-// Fallback Speicher (Falls Redis mal nicht erreichbar ist)
-let memoryStatus = "active";
+// Fallback Speicher (Falls Redis mal weg ist)
+let memoryStatus = "active"; // active, maintenance, closed
 let memoryLogs = [];
 
 export async function GET() {
@@ -14,14 +13,15 @@ export async function GET() {
   let logs = memoryLogs;
 
   try {
-    // Bei ioredis kommen Daten als String zurück, daher JSON.parse
+    // Daten aus Redis laden
     const kvStatus = await kv.get('kiosk_status');
     const kvLogsRaw = await kv.get('kiosk_logs');
     
     if (kvStatus) status = kvStatus;
+    // Da Redis Strings speichert, wandeln wir den String zurück in ein Array um
     if (kvLogsRaw) logs = JSON.parse(kvLogsRaw);
   } catch (e) {
-    console.log("Redis Labs nicht verbunden, nutze Memory");
+    console.log("Redis nicht verbunden, nutze Memory");
   }
 
   return NextResponse.json({ status, logs });
@@ -37,7 +37,9 @@ export async function POST(request) {
       memoryStatus = value;
       try { 
         await kv.set('kiosk_status', value); 
-      } catch(e){}
+      } catch(e) {
+        console.error("Redis SetStatus Fehler:", e);
+      }
     }
 
     // Neuen Log hinzufügen
@@ -48,18 +50,24 @@ export async function POST(request) {
       };
       
       memoryLogs.unshift(newLog);
-      if (memoryLogs.length > 50) memoryLogs.pop();
+      if (memoryLogs.length > 50) memoryLogs.pop(); // Max 50 Logs
       
       try { 
-        // Wir speichern das Array als JSON-String in Redis
+        // Wir speichern das gesamte Array als JSON-String
         await kv.set('kiosk_logs', JSON.stringify(memoryLogs)); 
-      } catch(e){}
+      } catch(e) {
+        console.error("Redis AddLog Fehler:", e);
+      }
     }
 
     // Logs löschen
     if (action === 'clearLogs') {
       memoryLogs = [];
-      try { await kv.set('kiosk_logs', JSON.stringify([])); } catch(e){}
+      try { 
+        await kv.set('kiosk_logs', JSON.stringify([])); 
+      } catch(e) {
+        console.error("Redis ClearLogs Fehler:", e);
+      }
     }
 
   } catch (error) {
