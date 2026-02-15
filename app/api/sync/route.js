@@ -1,34 +1,33 @@
-import admin from 'firebase-admin';
 import { NextResponse } from 'next/server';
 
-// Firebase Initialisierung
-if (!admin.apps.length) {
-  admin.initializeApp({
-    // Hier fügst du nur deine Firebase URL ein:
-    databaseURL: "https://durchagngssystem.firebaseio.com/" 
-  });
-}
-
-const db = admin.database();
+// DEINE FIREBASE URL (Muss mit https:// beginnen und auf .com/ enden)
+const FIREBASE_URL = "https://DEIN-PROJEKT-NAME.firebaseio.com/system";
 
 export async function GET() {
   try {
-    const snapshot = await db.ref('system').once('value');
-    const data = snapshot.val() || { status: 'active', logs: [] };
+    const res = await fetch(`${FIREBASE_URL}.json`);
+    const data = await res.val() || { status: 'active', logs: [] };
+    
+    // Falls die Datenbank komplett leer ist, Standardwerte senden
+    if (!data.status) data.status = 'active';
+    if (!data.logs) data.logs = [];
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Firebase GET Error:", error);
-    return NextResponse.json({ status: 'offline', logs: [] });
+    return NextResponse.json({ status: 'offline', logs: [], error: error.message });
   }
 }
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { action, value, logEntry } = body;
+    const { action, value, logEntry } = await request.json();
 
     if (action === 'setStatus') {
-      await db.ref('system/status').set(value);
+      await fetch(`${FIREBASE_URL}/status.json`, {
+        method: 'PUT',
+        body: JSON.stringify(value)
+      });
     }
 
     if (action === 'addLog') {
@@ -37,21 +36,29 @@ export async function POST(request) {
         msg: logEntry 
       };
       
-      const snapshot = await db.ref('system/logs').once('value');
-      let logs = snapshot.val() || [];
+      // Aktuelle Logs holen
+      const logRes = await fetch(`${FIREBASE_URL}/logs.json`);
+      let logs = await logRes.json() || [];
+      
       logs.unshift(newLog);
       if (logs.length > 50) logs.pop();
       
-      await db.ref('system/logs').set(logs);
+      // Neue Liste speichern
+      await fetch(`${FIREBASE_URL}/logs.json`, {
+        method: 'PUT',
+        body: JSON.stringify(logs)
+      });
     }
 
     if (action === 'clearLogs') {
-      await db.ref('system/logs').set([]);
+      await fetch(`${FIREBASE_URL}/logs.json`, {
+        method: 'PUT',
+        body: JSON.stringify([])
+      });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Firebase POST Error:", error);
-    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
