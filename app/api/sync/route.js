@@ -1,52 +1,32 @@
-import Redis from 'ioredis';
+import admin from 'firebase-admin';
 import { NextResponse } from 'next/server';
 
-// Optimierte Verbindungseinstellungen für Redis Labs
-const redisUrl = "redis://default:paxO5J56G4CxjJRhrMbIciADVVJjAyPr@redis-16099.c8.us-east-1-3.ec2.cloud.redislabs.com:16099";
-
-let kv;
-try {
-  kv = new Redis(redisUrl, {
-    connectTimeout: 10000, // 10 Sekunden Zeit zum Verbinden
-    maxRetriesPerRequest: 3
+// Firebase Initialisierung (verhindert Mehrfach-Initialisierung)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    // ERSETZE DIESE URL MIT DEINER FIREBASE URL:
+    databaseURL: "https://durchagngssystem.firebaseio.com/" 
   });
-  
-  kv.on('error', (err) => {
-    console.error("Redis Verbindungsfehler:", err);
-  });
-} catch (e) {
-  console.error("Redis Initialisierungsfehler:", e);
 }
 
-// Lokale Variablen als Sicherheit
-let memoryStatus = "active";
-let memoryLogs = [];
+const db = admin.database();
 
 export async function GET() {
   try {
-    // Teste ob die Verbindung steht
-    const kvStatus = await kv.get('kiosk_status').catch(() => null);
-    const kvLogsRaw = await kv.get('kiosk_logs').catch(() => null);
-    
-    let status = kvStatus || memoryStatus;
-    let logs = kvLogsRaw ? JSON.parse(kvLogsRaw) : memoryLogs;
-
-    return NextResponse.json({ status, logs });
+    const snapshot = await db.ref('system').once('value');
+    const data = snapshot.val() || { status: 'active', logs: [] };
+    return NextResponse.json(data);
   } catch (error) {
-    console.error("GET Fehler:", error);
-    // Selbst bei Fehler geben wir etwas zurück, damit die App nicht "OFFLINE" anzeigt
-    return NextResponse.json({ status: memoryStatus, logs: memoryLogs, debug: error.message });
+    return NextResponse.json({ status: 'error', logs: [], msg: error.message });
   }
 }
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { action, value, logEntry } = body;
+    const { action, value, logEntry } = await request.json();
 
     if (action === 'setStatus') {
-      memoryStatus = value;
-      await kv.set('kiosk_status', value);
+      await db.ref('system/status').set(value);
     }
 
     if (action === 'addLog') {
@@ -55,25 +35,21 @@ export async function POST(request) {
         msg: logEntry 
       };
       
-      // Aus Redis laden, aktualisieren, speichern
-      const kvLogsRaw = await kv.get('kiosk_logs');
-      let currentLogs = kvLogsRaw ? JSON.parse(kvLogsRaw) : [];
+      // Holen, Hinzufügen, Kürzen, Speichern
+      const snapshot = await db.ref('system/logs').once('value');
+      let logs = snapshot.val() || [];
+      logs.unshift(newLog);
+      if (logs.length > 50) logs.pop();
       
-      currentLogs.unshift(newLog);
-      if (currentLogs.length > 50) currentLogs.pop();
-      
-      memoryLogs = currentLogs;
-      await kv.set('kiosk_logs', JSON.stringify(currentLogs));
+      await db.ref('system/logs').set(logs);
     }
 
     if (action === 'clearLogs') {
-      memoryLogs = [];
-      await kv.set('kiosk_logs', JSON.stringify([]));
+      await db.ref('system/logs').set([]);
     }
 
-    return NextResponse.json({ success: true, status: memoryStatus, logs: memoryLogs });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("POST Fehler:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
