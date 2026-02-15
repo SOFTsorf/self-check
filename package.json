@@ -10,6 +10,6 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "ioredis": "latest"
+    "firebase-admin": "latest"
   }
 }
